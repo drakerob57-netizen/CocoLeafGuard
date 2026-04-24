@@ -1,0 +1,193 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+@view-transition {
+  navigation: auto;
+}
+
+body{
+    background-color: #FAF9F6;
+}
+
+html{
+    scroll-behavior: smooth;
+}
+
+.bg-primary, .btn-primary{
+    background-color: #33B82F !important;
+    border: 0;
+}
+
+.text-primary{
+    color:#33B82F !important; 
+}
+
+
+header{
+    padding: .5%;
+    position: sticky;
+    top: 0;
+    z-index: 9999;
+
+
+    background-color: rgba(255, 255, 255, 0.8);
+
+    
+    backdrop-filter: blur(5px); 
+    -webkit-backdrop-filter: blur(5px);
+    
+    
+    border-bottom: 2px solid color-mix(in srgb, #FAF9F6, black 5%);
+    
+    transition: all 0.3s ease-in-out;
+    
+}
+
+
+header .logo img {
+    width: 100%;
+    height: 65px;
+}
+
+.container-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+nav ul {
+    list-style: none;
+    display: flex;
+    gap: 30px;
+    margin: 0 auto;
+}
+
+nav ul li {
+    cursor: pointer;
+    font-weight: 500;
+    transition: color 0.3s ease;
+}
+
+nav ul li a {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    width: 100%;
+}
+
+nav ul li a:hover {
+    color: #33B82F;
+}
+
+.try-button{
+    padding: 15px 0px;
+    min-width: 175px;
+    border-radius: 10px;
+}
+
+.hero-section{
+    background-image: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), 
+                    url('../img/coconut_hero_section.jpg');
+
+    
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    padding-left: 5em;
+    padding-right: 5em;
+}
+
+.hero-section .row{
+    max-width: 800px;
+}
+
+.problem-section{
+    padding: 5em 1em;
+}
+
+.problem-section-upper{
+    padding-top: 0;
+    padding-left: 15em;
+    padding-right: 15em;
+    padding-bottom: 5em;
+}
+
+.problem-section-lower img, .technical-section img{
+    width: auto;
+    height: 5em;
+    object-fit: contain;
+    
+}
+
+.bg-white{
+    background-color: #FAF9F6 !important;
+}
+
+.sdg-section{
+    padding: 5em 1em;
+    background-color: color-mix(in srgb, #FAF9F6, black 2%);
+}
+
+
+.sdg-section ul {
+    list-style-position: inside;
+    padding-left: 0;             
+    display: flex;
+    flex-direction: column;
+    gap: 15px;                   
+    margin-top: 20px;
+}
+
+.sdg-section ul li::marker{
+    color: #33B82F;              
+    font-size: 1.3em;            
+}
+
+.sdg-section img{
+    width: auto;
+    height: 7em;
+    object-fit: contain;
+}
+
+.launch-tool-section{
+     height: 50vh;
+}
+
+.AboutProject-section, .technical-section{
+     padding: 5em 1em;
+     
+}
+
+.AboutProject-section .row{
+    max-width: 900px;
+}
+
+.project_overview-section{
+    padding: 5em 0em;
+    background-color: color-mix(in srgb, #FAF9F6, black 2%);
+}
+
+
+.technical-section ul {
+    list-style-position: inside;
+    padding-left: 0;             
+    display: flex;
+    flex-direction: column;
+    gap: 5px;                   
+    margin-top: 20px;
+}
+
+.technical-section ul li::marker{
+    color: #33B82F;              
+    font-size: .7em;            
+}
+
+.technical-section .card{
+     border-radius: 10px;
+}
