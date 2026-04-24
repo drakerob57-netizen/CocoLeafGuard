@@ -39,8 +39,8 @@
                             <img src="../img/coco_logo.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
-                            <h5 class="card-title fw-bold">Manual Inspection</h5>
-                            <p class="card-text text-muted">Farmers must manually check thousands of leaves, which is labor-intensive and delays critical treatment.</p>
+                            <h5 class="card-title fw-bold">Early Detection</h5>
+                            <p class="card-text text-muted">Identify diseases at early stages before they spread and cause irreversible damage to plantations.</p>
                         </div>
                     </div>
                 </div>
@@ -50,8 +50,8 @@
                             <img src="../img/coco_logo.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
-                            <h5 class="card-title fw-bold">Manual Inspection</h5>
-                            <p class="card-text text-muted">Farmers must manually check thousands of leaves, which is labor-intensive and delays critical treatment.</p>
+                            <h5 class="card-title fw-bold">Accurate Classification</h5>
+                            <p class="card-text text-muted">Precisely classify disease types using advanced machine learning for targeted treatment strategies.</p>
                         </div>
                     </div>
                 </div>
@@ -61,8 +61,8 @@
                             <img src="../img/coco_logo.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
-                            <h5 class="card-title fw-bold">Manual Inspection</h5>
-                            <p class="card-text text-muted">Farmers must manually check thousands of leaves, which is labor-intensive and delays critical treatment.</p>
+                            <h5 class="card-title fw-bold">Accessible Technology</h5>
+                            <p class="card-text text-muted">Provide farmers with easy-to-use tools that democratize access to agricultural expertise.</p>
                         </div>
                     </div>
                 </div>
