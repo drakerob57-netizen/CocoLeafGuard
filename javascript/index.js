@@ -85,30 +85,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Add this missing function to prevent the script from crashing
     function renderProcessingState() {
-        const resultsCardBody = document.querySelector('.col-md-6:last-child .card-custom');
-        if (resultsCardBody) {
-            resultsCardBody.innerHTML = `
-                <h4 class="fw-bold mb-4">Analysis Results</h4>
-                <div class="py-5 text-center">
-                    <div class="spinner-border text-success" role="status"></div>
-                    <p class="mt-3 text-muted">Processing image with YOLOv8-seg...</p>
+        contentArea.innerHTML = `
+            <div class="col-12 text-center py-5">
+                <div class="spinner-border text-success" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Loading...</span>
                 </div>
-            `;
-        }
-    }
+                <h5 class="mt-3 fw-bold text-success">Analyzing Leaf...</h5>
+                <p class="text-muted small">Please wait while the AI model processes the image.</p>
+            </div>
+        `;
+    }   
 
     function renderResultsState(file, apiResponse) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            const imageUrl = e.target.result;
+            const rawImageUrl = e.target.result;
+            
+            if (apiResponse.error) {
+                alert("Error: " + apiResponse.error);
+                return;
+            }
+            
+            // Get the analyzed image URL from the AI, fallback to raw if missing
+            const analyzedImageUrl = apiResponse.analyzed_image_url || rawImageUrl;
             
             contentArea.innerHTML = `
                 <div class="col-md-6 mb-4">
                     <div class="card-custom text-center h-100 d-flex flex-column align-items-center">
-                        <h4 class="fw-bold mb-4">Upload Image</h4>
-                        <img src="${imageUrl}" class="img-fluid rounded mb-3" style="max-height: 400px; object-fit: contain;" alt="Uploaded Leaf">
-                        <button class="btn btn-upload-different" onclick="location.reload();">Upload Different Image</button>
+                        <h4 class="fw-bold mb-3">Leaf Image</h4>
+                        
+                        <div class="btn-group mb-3" role="group" aria-label="Image Toggle">
+                            <button type="button" class="btn btn-outline-success active" id="btn-analyzed" 
+                                onclick="document.getElementById('display-img').src='${analyzedImageUrl}'; this.classList.add('active'); document.getElementById('btn-raw').classList.remove('active');">
+                                Analyzed Result
+                            </button>
+                            <button type="button" class="btn btn-outline-success" id="btn-raw" 
+                                onclick="document.getElementById('display-img').src='${rawImageUrl}'; this.classList.add('active'); document.getElementById('btn-analyzed').classList.remove('active');">
+                                Original Image
+                            </button>
+                        </div>
+
+                        <img src="${analyzedImageUrl}" id="display-img" class="img-fluid rounded mb-4" style="max-height: 400px; object-fit: contain;" alt="Leaf View">
+                        
+                        <button class="btn btn-upload-different mt-auto" onclick="location.reload();">Upload Different Image</button>
                     </div>
                 </div>
 
@@ -121,8 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                 <div class="d-flex align-items-center">
                                     <span class="icon-severe me-3">⚠️</span>
                                     <div>
-                                        <h6 class="status-text-severe mb-0">${apiResponse.severity || 'Severe'}</h6>
-                                        <p class="small text-muted mb-0">${(apiResponse.overall_affected * 100).toFixed(1)}%</p>
+                                        <h6 class="status-text-severe mb-0">${apiResponse.status || 'Unknown'}</h6>
+                                        <p class="small text-muted mb-0">${apiResponse.affected_area}%</p>
                                         <p class="small text-muted mb-0">Overall affected area</p>
                                     </div>
                                 </div>
@@ -130,15 +151,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         </div>
                         
                         <h6 class="fw-bold mb-3">Symptom Distribution</h6>
-                        ${apiResponse.symptoms.map(s => `
+                        ${(apiResponse.symptoms || []).map(s => `
                             <div class="symptom-card">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <div class="d-flex align-items-center">
                                         <span class="symptom-indicator me-3" style="background-color: ${s.color};"></span>
-                                        <span>${s.name}</span>
+                                        <span>${s.label}</span>
                                     </div>
                                     <div class="text-end">
-                                        <span class="fw-bold">${(s.percentage * 100).toFixed(1)}%</span><br>
+                                        <span class="fw-bold">${s.percent}%</span><br>
                                         <span class="small text-muted">${s.count} detected</span>
                                     </div>
                                 </div>
@@ -148,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="mt-4">
                             <h6 class="fw-bold">Recommendations</h6>
                             <ul class="small text-muted ps-3">
-                                ${apiResponse.recommendations.map(r => `<li>${r}</li>`).join('')}
+                                ${(apiResponse.recommendations || []).map(r => `<li>${r}</li>`).join('')}
                             </ul>
                         </div>
                     </div>

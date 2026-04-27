@@ -6,31 +6,47 @@ from ultralytics import YOLO
 
 def run_prediction(image_path):
     try:
-        # Use absolute paths so PHP never gets confused
         script_dir = os.path.dirname(os.path.abspath(__file__))
+        model_path = os.path.join(script_dir, 'yellowinggrayspot.pt')
         
-        # 1. POINT TO YOUR RENAMED FILE
-        model_path = os.path.join(script_dir, 'best.pt')
-        
-        # 2. Load the model
         model = YOLO(model_path)
         
-        # 3. Run inference - verbose=False stops the download bar from breaking PHP
+        # Run inference
         results = model.predict(source=image_path, conf=0.25, save=False, verbose=False)
         result = results[0]
 
+        # --- NEW: SAVE THE ANALYZED IMAGE ---
+        # Create a new filename for the analyzed image (e.g., "analyzed_1690000_leaf.jpg")
+        base_name = os.path.basename(image_path)
+        upload_dir = os.path.dirname(image_path)
+        analyzed_filename = f"analyzed_{base_name}"
+        analyzed_filepath = os.path.join(upload_dir, analyzed_filename)
+        
+        # Draw the masks and save it
+        result.save(filename=analyzed_filepath)
+        
+        # The URL path that the frontend will use to display the image
+        analyzed_image_url = f"../uploads/{analyzed_filename}"
+        # ------------------------------------
+
         if result.masks is None:
-            print(json.dumps({"status": "Healthy", "affected_area": 0.0, "symptoms": [], "recommendations": ["Continue standard care."]}))
+            output = {
+                "status": "Healthy",
+                "affected_area": 0.0,
+                "symptoms": [],
+                "recommendations": ["Continue standard care and monitoring."],
+                "analyzed_image_url": analyzed_image_url # Added here
+            }
+            print(json.dumps(output))
             return
 
-        # --- SEVERITY & SYMPTOM LOGIC ---
-        masks = result.masks.data
-        classes = result.boxes.cls.int()
-        names = result.names
-        _, H, W = masks.shape
-        leaflet_area_pixels = H * W
+        masks = result.masks.data 
+        classes = result.boxes.cls.int() 
+        names = result.names 
 
-        # Area calculation using Boolean OR (union)
+        _, H, W = masks.shape
+        leaflet_area_pixels = H * W  
+
         overall_union_mask = torch.any(masks, dim=0)
         total_affected_pixels = overall_union_mask.sum().item()
         overall_affected_pct = total_affected_pixels / leaflet_area_pixels
@@ -45,30 +61,43 @@ def run_prediction(image_path):
 
         symptoms_output = []
         
-        # 4. ROBOFLOW CLASS NAMES (Must be exact match)
         color_map = {
-            "yellowing": "#FFC107", 
-            "gray spot": "#6C757D", 
-            "leaf rot": "#A52A2A" # Adjust if your 3rd class is named differently
+            "yellowing": "#FFC107",
+            "gray spot": "#6C757D",
+            "leaf rot": "#A52A2A"
         }
 
         for class_name, data in symptom_stats.items():
             class_masks_tensor = torch.stack(data["mask_list"])
             class_union_mask = torch.any(class_masks_tensor, dim=0)
-            class_pct = class_union_mask.sum().item() / leaflet_area_pixels
+            class_affected_pixels = class_union_mask.sum().item()
+            
+            class_pct = class_affected_pixels / leaflet_area_pixels
+            safe_class_name = str(class_name).lower().strip()
             
             symptoms_output.append({
                 "label": class_name,
                 "percent": round(class_pct * 100, 1),
                 "count": data["count"],
-                "color": color_map.get(class_name, "#33B82F")
+                "color": color_map.get(safe_class_name, "#33B82F")
             })
 
+        if overall_affected_pct > 0.50:
+            status_label = "Severe"
+            recs = ["Isolate affected plants immediately", "Remove severely infected leaves", "Consult specialist"]
+        elif overall_affected_pct > 0.15:
+            status_label = "Moderate"
+            recs = ["Apply targeted fungicide", "Monitor spread daily"]
+        else:
+            status_label = "Mild"
+            recs = ["Ensure proper watering and drainage", "Apply preventative treatments"]
+
         output = {
-            "status": "Severe" if overall_affected_pct > 0.50 else "Moderate",
+            "status": status_label,
             "affected_area": round(overall_affected_pct * 100, 1),
             "symptoms": symptoms_output,
-            "recommendations": ["Check plantation health."]
+            "recommendations": recs,
+            "analyzed_image_url": analyzed_image_url # Added here
         }
 
         print(json.dumps(output))
