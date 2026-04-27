@@ -1,37 +1,47 @@
 <?php
 header('Content-Type: application/json');
 
-// Allow the script to run for up to 5 minutes
-set_time_limit(300); 
+// Increase time limit for the model to load
+set_time_limit(120);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['image'])) {
-    $uploadDir = '../uploads/';
+    $uploadDir = '../uploads/'; 
     if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
     $file = $_FILES['image'];
     $targetFile = $uploadDir . time() . '_' . basename($file['name']);
 
     if (move_uploaded_file($file['tmp_name'], $targetFile)) {
-        // Ensure you are calling the correct python path (e.g., 'python' or 'python3')
-        $pythonPath = 'python3'; 
+        
+        $pythonPath = 'python'; // Change back to 'python' if you are on Windows and it fails
         $scriptPath = '../ai_model/predict.py';
         
         $escapedImage = escapeshellarg($targetFile);
         $command = "$pythonPath $scriptPath $escapedImage 2>&1";
         
+        // Execute Python
         $output = shell_exec($command);
-        $aiResults = json_decode($output, true);
+
+        // EXTRACTION FIX: Find ONLY the JSON block inside the output
+        if (preg_match('/\{.*\}/s', $output, $matches)) {
+            $jsonContent = $matches[0];
+            $aiResults = json_decode($jsonContent, true);
+        } else {
+            $aiResults = null;
+        }
 
         if ($aiResults) {
             echo json_encode($aiResults);
         } else {
             echo json_encode([
                 "error" => "AI processing failed.",
-                "debug_raw" => $output 
+                "debug" => $output 
             ]);
         }
     } else {
-        echo json_encode(["error" => "Failed to move uploaded file."]);
+        echo json_encode(["error" => "Failed to move uploaded file. Check folder permissions."]);
     }
+} else {
+    echo json_encode(["error" => "Invalid request. No image found."]);
 }
 ?>
