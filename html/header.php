@@ -22,7 +22,7 @@
             <nav class="nav-menu" id="nav-menu">
                 <ul>
                     <li><a href="home.php">Home</a></li>
-                    <li><a href="#tool">Tool</a></li>
+                    <li><a href="tool.php">Tool</a></li>
                     <li><a href="about_us.php">About Us</a></li>
                 </ul>
             </nav>

@@ -202,6 +202,7 @@ nav ul li a:hover {
 }
 
 
+
 /* Initial hidden state */
 .reveal {
     opacity: 0;
@@ -215,4 +216,90 @@ nav ul li a:hover {
     opacity: 1;
     transform: translateY(0) scale(1);
     visibility: visible;
+}
+
+/* tools section */
+.tool-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+}
+        
+.tool-subtitle {
+    color: #777;
+    font-size: 1.1rem;
+    max-width: 600px;
+     margin: 0 auto;
+}
+        
+.card-custom {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+    padding: 30px;
+    border: none;
+}
+        
+/* Upload Area (Pre-Upload) */
+.upload-area {
+    border: 2px dashed #C1C9D2;
+    border-radius: 12px;
+    padding: 60px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+        
+.upload-area:hover, .upload-area.dragging {
+    border-color: #33B82F; /* Match primary green */
+    background-color: rgba(51, 184, 47, 0.05);
+}
+        
+.upload-icon {
+    font-size: 3rem;
+    color: #889;
+}
+        
+/* Results Area (Post-Upload) */
+.card-result-severe {
+    background-color: #FFF2F2;
+    border: 1px solid #FFCFCF;
+    border-radius: 10px;
+    padding: 20px;
+}
+        
+.icon-severe {
+    font-size: 1.5rem;
+    color: #DC3545; /* Red */
+}
+        
+.status-text-severe {
+    color: #80222C;
+    font-weight: 600;
+}
+        
+.percentage-large {
+    font-size: 2.3rem;
+    font-weight: 700;
+    color: #DC3545;
+}
+        
+.symptom-card {
+    background-color: #F8F9FA;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+}
+        
+.symptom-indicator {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    display: inline-block;
+}
+        
+.btn-upload-different {
+    border: 1px solid #CCC;
+    color: #555;
+    padding: 10px 20px;
+    border-radius: 8px;
+    margin-top: 15px;
 }
