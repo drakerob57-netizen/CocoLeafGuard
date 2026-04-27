@@ -118,7 +118,7 @@ nav ul li a:hover {
     padding-bottom: 5em;
 }
 
-.problem-section-lower img, .technical-section img{
+.problem-section-lower img, .technical-section img, .research-team-section img{
     width: auto;
     height: 5em;
     object-fit: contain;
@@ -190,4 +190,29 @@ nav ul li a:hover {
 
 .technical-section .card{
      border-radius: 10px;
+}
+
+.research-team-section .third-card{
+    max-width: 50%;
+}
+
+.impact-section{
+    height:50vh;
+    margin-top: 2em;
+}
+
+
+/* Initial hidden state */
+.reveal {
+    opacity: 0;
+    transform: translateY(30px) scale(0.95);
+    transition: all 0.8s ease-out;
+    visibility: hidden;
+}
+
+/* State when the element enters the viewport */
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    visibility: visible;
 }

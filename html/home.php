@@ -13,18 +13,18 @@
         <div class="container d-flex vh-100 justify-content-center align-items-center">
             <div class="row text-start gap-4">
                 <div class="col-12">
-                    <h3 class="text-white">Coconut Leaf Health Assessment Using AI</h3>
+                    <h3 class="text-white reveal">Coconut Leaf Health Assessment Using AI</h3>
                 </div>
                 <div class="col-12">
-                    <h5 class="text-white fw-normal">Advanced detection and classification of coconut leaf diseases using YOLOv8-seg and Random Forest machine learning models.</h5>
+                    <h5 class="text-white fw-normal reveal">Advanced detection and classification of coconut leaf diseases using YOLOv8-seg and Random Forest machine learning models.</h5>
                 </div>
                 <div class="col-12">
-                    <button type="button" class="btn btn-primary btn-lg fs-6 try-button">Try the tool -></button>
+                    <button type="button" class=" reveal btn btn-primary btn-lg fs-6 try-button">Try the tool -></button>
                 </div>
             </div>
         </div>
     </section>
-    <section class="problem-section">
+    <section class="problem-section reveal">
         <div class="container">
             <div class="row problem-section-upper text-center">
                 <div class="col">
@@ -69,7 +69,7 @@
             </div>
         </div>
     </section>
-    <section class="sdg-section">
+    <section class="sdg-section reveal">
         <div class="container">
             <div class="row">
                 <div class="col-6">
@@ -101,17 +101,17 @@
         <div class="container">
             <div class="row gap-3">
                 <div class="col-12">
-                    <h4 class="text-white">Ready to Analyze Your Coconut Leaves?</h4>
+                    <h4 class="text-white reveal">Ready to Analyze Your Coconut Leaves?</h4>
                 </div>
                 <div class="col-12">
-                    <h4 class=" fw-normal text-white">Upload an image and get instant AI-powered health assessment results.</h4>
+                    <h4 class=" fw-normal text-white reveal">Upload an image and get instant AI-powered health assessment results.</h4>
                 </div>
                 <div class="col-12">
-                    <button type="button" class="btn bg-white btn-lg px-4 text-primary fs-6 try-button">Launch the Tool -></button>
+                    <button type="button" class=" reveal btn bg-white btn-lg px-4 text-primary fs-6 try-button">Launch the Tool -></button>
                 </div>
             </div>
         </div>
     </section>
-
+    <script src="../javascript/index.js"></script>
 </body>
 </html>
