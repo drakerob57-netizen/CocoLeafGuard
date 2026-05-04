@@ -19,7 +19,7 @@
                     <h5 class="text-white fw-normal reveal">Advanced detection and classification of coconut leaf diseases using YOLOv8-seg and Random Forest machine learning models.</h5>
                 </div>
                 <div class="col-12">
-                    <button type="button" class=" reveal btn btn-primary btn-lg fs-6 try-button">Try the tool -></button>
+                    <button type="button" class=" reveal btn btn-primary btn-lg fs-6 try-button">Check Health -></button>
                 </div>
             </div>
         </div>
@@ -36,7 +36,7 @@
                 <div class="col-4">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/target.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
                             <h5 class="card-title fw-bold">Early Detection</h5>
@@ -47,7 +47,7 @@
                 <div class="col-4">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/leaf.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
                             <h5 class="card-title fw-bold">Accurate Classification</h5>
@@ -58,7 +58,7 @@
                 <div class="col-4">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/globe.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
                             <h5 class="card-title fw-bold">Accessible Technology</h5>
@@ -86,7 +86,7 @@
                 <div class="col-6">
                     <div class="card h-100 border-0 shadow bg-white p-3">
                         <div class="col d-flex justify-content-center">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/logowcircle.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4 text-center">
                             <h5 class="card-title fw-bold">Life on Land</h5>
@@ -101,13 +101,13 @@
         <div class="container">
             <div class="row gap-3">
                 <div class="col-12">
-                    <h4 class="text-white reveal">Ready to Analyze Your Coconut Leaves?</h4>
+                    <h4 class="text-white reveal">Ready to Check Your Coconut Leaves?</h4>
                 </div>
                 <div class="col-12">
                     <h4 class=" fw-normal text-white reveal">Upload an image and get instant AI-powered health assessment results.</h4>
                 </div>
                 <div class="col-12">
-                    <button type="button" class=" reveal btn bg-white btn-lg px-4 text-primary fs-6 try-button">Launch the Tool -></button>
+                    <button type="button" class=" reveal btn bg-white btn-lg px-4 text-primary fs-6 try-button">Scan Leaves -></button>
                 </div>
             </div>
         </div>

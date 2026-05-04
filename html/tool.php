@@ -10,7 +10,7 @@
 <body>
  <?php include 'header.php'; ?>
 
-    <main class="bg-custom-off-white py-5 min-vh-100">
+    <main class="bg-custom-off-white py-5 min-vh-100 reveal">
         <div class="container text-center mb-5">
             <h1 class="tool-title">Coconut Leaf Health Analysis</h1>
             <p class="tool-subtitle">Upload a clear image of a coconut leaf to receive AI-powered health assessment using YOLOv8-seg and Random Forest models.</p>
@@ -33,10 +33,10 @@
                 </div>
 
                 <div class="col-md-6 mb-4">
-                    <div class="card-custom text-center h-100 d-flex flex-column justify-content-center">
+                    <div class="upload-section card-custom text-center h-100 d-flex flex-column justify-content-center">
                         <h4 class="fw-bold mb-4">Analysis Results</h4>
                         <div class="py-5 text-muted">
-                            <span style="font-size: 3rem;">🍂</span>
+                             <img src="../img/leafanalysis.png" class="img-fluid">
                             <p class="mt-3">Upload an image to begin analysis</p>
                         </div>
                     </div>

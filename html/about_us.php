@@ -43,7 +43,7 @@
         <div class="container">
             <div class="row text-center">
                 <div class="col-12">
-                    <img src="../img/coco_logo.png" class="img-fluid">
+                    <img src="../img/gear.png" class="img-fluid">
                 </div>
                 <div class="col-12">
                     <h5>Technical Approach</h5>
@@ -54,7 +54,7 @@
                 <div class="col-6">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/vision.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
                             <h5 class="card-title fw-bold">YOLOv8-seg</h5>
@@ -70,7 +70,7 @@
                 <div class="col-6">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/health.png" class="img-fluid">
                         </div>
                         <div class="card-body p-4">
                             <h5 class="card-title fw-bold">Random Forest</h5>
@@ -90,7 +90,7 @@
         <div class="container">
             <div class="row text-center">
                 <div class="col-12">
-                    <img src="../img/coco_logo.png" class="img-fluid">
+                    <img src="../img/people.png" class="img-fluid">
                 </div>
                 <div class="col-12">
                     <h5 class="fw-bold">Research Team</h5>
@@ -100,52 +100,40 @@
                     <br>
                 </div>
             </div>
-            <div class="row d-flex justify-content-center gy-3">
+            <div class="row d-flex justify-content-center gy-5">
                 <div class="col-6">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/programmer.png" class="img-fluid">
                         </div>
-                        <div class="card-body p-4">
-                            <h5 class="card-title fw-bold">Random Forest</h5>
-                            <p class="card-text text-muted">Ensemble learning method that classifies leaf health status and disease types based on features extracted from segmented regions.</p>
-                            <ul>
-                                <li>Robust overfitting</li>
-                                <li>Handle multi class symptom</li>
-                                <li>Provides confidence scores</li>
-                            </ul>
+                        <div class="card-body p-3">
+                            <h5 class="card-title fw-bold">Cristeto M. Turiano</h5>
+                            <h6 class="text-primary">Lead Programmer</h6>
+                            <p class="card-text text-muted">Responsible for designing and implementing the core AI algorithms and software architecture.</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-6">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/pencil.png" class="img-fluid">
                         </div>
-                        <div class="card-body p-4">
-                            <h5 class="card-title fw-bold">Random Forest</h5>
-                            <p class="card-text text-muted">Ensemble learning method that classifies leaf health status and disease types based on features extracted from segmented regions.</p>
-                            <ul>
-                                <li>Robust overfitting</li>
-                                <li>Handle multi class symptom</li>
-                                <li>Provides confidence scores</li>
-                            </ul>
+                        <div class="card-body p-3">
+                            <h5 class="card-title fw-bold">Jan Drake L. Robillo</h5>
+                            <h6 class="text-primary">UI/UX Designer</h6>
+                            <p class="card-text text-muted">Responsible for creating intuitive user interfaces and seamless user experiences for the application.</p>
                         </div>
                     </div>
                 </div>
                 <div class="col-12 third-card">
                     <div class="card h-100 border-1 bg-white p-3">
                         <div class="col d-flex justify-content-start">
-                            <img src="../img/coco_logo.png" class="img-fluid">
+                            <img src="../img/document.png" class="img-fluid">
                         </div>
-                        <div class="card-body p-4">
-                            <h5 class="card-title fw-bold">Random Forest</h5>
-                            <p class="card-text text-muted">Ensemble learning method that classifies leaf health status and disease types based on features extracted from segmented regions.</p>
-                            <ul>
-                                <li>Robust overfitting</li>
-                                <li>Handle multi class symptom</li>
-                                <li>Provides confidence scores</li>
-                            </ul>
+                        <div class="card-body p-3">
+                            <h5 class="card-title fw-bold">Philip Emerson C. Jayoma</h5>
+                            <h6 class="text-primary">Technical Writer</h6>
+                            <p class="card-text text-muted">Responsible for creating comprehensive documentation and user guides for the application.</p>
                         </div>
                     </div>
                 </div>
