@@ -118,7 +118,7 @@ nav ul li a:hover {
     padding-bottom: 5em;
 }
 
-.problem-section-lower img, .technical-section img, .research-team-section img{
+.problem-section-lower img, .technical-section img, .research-team-section img, .upload-section img{
     width: auto;
     height: 5em;
     object-fit: contain;
