@@ -36,7 +36,7 @@
                     <div class="card-custom text-center h-100 d-flex flex-column justify-content-center">
                         <h4 class="fw-bold mb-4">Analysis Results</h4>
                         <div class="py-5 text-muted">
-                            <span style="font-size: 3rem;">🍂</span>
+                            <span style="font-size: 3rem;">insert loader</span>
                             <p class="mt-3">Upload an image to begin analysis</p>
                         </div>
                     </div>
