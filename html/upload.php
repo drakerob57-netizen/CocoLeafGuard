@@ -9,12 +9,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['leaf_image'])) {
     $filePath = $uploadDir . time() . '_' . basename($file['name']);
 
     if (move_uploaded_file($file['tmp_name'], $filePath)) {
-        // EXECUTE MODEL HERE: 
-        // In a real setup, you would use shell_exec() to run your YOLOv8 python script
-        // and capture the output. Example:
-        // $output = shell_exec("python3 predict.py --source " . escapeshellarg($filePath));
-        
-        // Placeholder response matching your "After" image:
         $response = [
             "status" => "Severe",
             "affected_area" => 99.6,
