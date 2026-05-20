@@ -303,3 +303,12 @@ nav ul li a:hover {
     border-radius: 8px;
     margin-top: 15px;
 }
+
+/* ── Modal Overlay z-index adjustments ─────────────────────── */
+.modal-backdrop {
+    z-index: 10000 !important;
+}
+
+.modal {
+    z-index: 10001 !important;
+}

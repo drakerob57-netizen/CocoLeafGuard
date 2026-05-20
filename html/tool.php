@@ -157,9 +157,9 @@
             <button class="mode-tab-btn active" id="tab-upload" onclick="switchMode('upload')">
                 &#128247; Upload Image
             </button>
-            <!--<button class="mode-tab-btn" id="tab-realtime" onclick="switchMode('realtime')">
+            <button class="mode-tab-btn" id="tab-realtime" onclick="switchMode('realtime')">
                 &#127909; Real-Time Camera
-            </button> -->
+            </button>
         </div>
     </div>
 
@@ -219,7 +219,7 @@
                     <div id="webcam-controls">
                         <button class="webcam-btn webcam-btn-start" id="btn-start-cam"   onclick="startWebcam()">Start Camera</button>
                         <button class="webcam-btn webcam-btn-snap"  id="btn-snap"        onclick="captureAndAnalyze()">&#128247; Capture &amp; Analyse</button>
-                        <button class="webcam-btn webcam-btn-auto"  id="btn-auto-toggle" onclick="toggleAutoCapture()">&#9654; Auto (5 s)</button>
+                        <button class="webcam-btn webcam-btn-auto"  id="btn-auto-toggle" onclick="toggleAutoCapture()">&#9654; Auto (3 s)</button>
                         <button class="webcam-btn webcam-btn-stop"  id="btn-stop-cam"    onclick="stopWebcam()">Stop Camera</button>
                     </div>
                     <p class="webcam-status" id="webcam-status">Click "Start Camera" to begin.</p>
@@ -261,6 +261,7 @@
     </div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 <script src="../javascript/index.js"></script>
 
@@ -268,23 +269,30 @@
 /* ════════════════════════════════════════════════════════════
    MODE SWITCHER
 ════════════════════════════════════════════════════════════ */
-function switchMode(mode) {
+async function switchMode(mode) {
     const uploadPanel   = document.getElementById('upload-panel');
     const realtimePanel = document.getElementById('realtime-panel');
     const tabUpload     = document.getElementById('tab-upload');
     const tabRealtime   = document.getElementById('tab-realtime');
 
     if (mode === 'upload') {
-        uploadPanel.style.display   = '';
+        uploadPanel.style.display   = 'block';
         realtimePanel.style.display = 'none';
         tabUpload.classList.add('active');
         tabRealtime.classList.remove('active');
-        stopWebcam();   // cleanly release camera when switching away
+        stopWebcam();
     } else {
         uploadPanel.style.display   = 'none';
-        realtimePanel.style.display = '';
+        realtimePanel.style.display = 'block';
         tabUpload.classList.remove('active');
         tabRealtime.classList.add('active');
+
+        if (!_stream) {
+            await startWebcam();
+        }
+        if (_stream && !_autoRunning) {
+            startAutoCapture();
+        }
     }
 }
 
@@ -294,7 +302,7 @@ function switchMode(mode) {
 let _stream       = null;
 let _autoInterval = null;
 let _autoRunning  = false;
-const AUTO_INTERVAL_MS = 5000;
+const AUTO_INTERVAL_MS = 3000; // 3 s — safe with FastAPI (was 5 s with PHP shell)
 
 async function startWebcam() {
     try {
@@ -306,11 +314,11 @@ async function startWebcam() {
         video.srcObject = _stream;
         await video.play();
 
-        document.getElementById('webcam-badge').style.display  = '';
+        document.getElementById('webcam-badge').style.display  = 'inline-block';
         document.getElementById('btn-start-cam').style.display = 'none';
-        document.getElementById('btn-stop-cam').style.display  = '';
-        document.getElementById('btn-snap').style.display      = '';
-        document.getElementById('btn-auto-toggle').style.display = '';
+        document.getElementById('btn-stop-cam').style.display  = 'inline-block';
+        document.getElementById('btn-snap').style.display      = 'inline-block';
+        document.getElementById('btn-auto-toggle').style.display = 'inline-block';
         document.getElementById('webcam-status').textContent   = 'Camera active. Capture a frame or enable auto-capture.';
     } catch (err) {
         document.getElementById('webcam-status').textContent =
@@ -347,9 +355,9 @@ function toggleAutoCapture() {
 
 function startAutoCapture() {
     _autoRunning = true;
-    document.getElementById('btn-auto-toggle').textContent = '&#9646;&#9646; Auto (5 s)';
+    document.getElementById('btn-auto-toggle').textContent = '⏸ Auto (3 s)';
     document.getElementById('webcam-wrapper').classList.add('auto-active');
-    document.getElementById('webcam-status').textContent   = 'Auto-capture active — analysing every 5 seconds…';
+    document.getElementById('webcam-status').textContent   = 'Auto-capture active — analysing every 3 seconds…';
     captureAndAnalyze();                                // fire immediately
     _autoInterval = setInterval(captureAndAnalyze, AUTO_INTERVAL_MS);
 }
@@ -389,7 +397,7 @@ async function captureAndAnalyze() {
         formData.append('image', blob, `webcam_${Date.now()}.jpg`);
 
         try {
-            const resp = await fetch('process-image.php', { method: 'POST', body: formData });
+            const resp = await fetch('http://localhost:8000/predict', { method: 'POST', body: formData });
             const data = await resp.json();
             if (data.error) {
                 setRtStatus('Error: ' + data.error);
@@ -474,6 +482,10 @@ function renderResults(data, placeholderId, contentId) {
         </div>` : ''}
     `;
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+    switchMode('upload');
+});
 
 function toggleOverlay(btn, className) {
     btn.classList.toggle('active');

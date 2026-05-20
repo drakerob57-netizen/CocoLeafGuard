@@ -1,5 +1,7 @@
 import sys
 import json
+import time
+import uuid
 import torch
 import os
 import cv2
@@ -11,12 +13,14 @@ from ultralytics import YOLO
 os.environ["CUDA_VISIBLE_DEVICES"] = ""   # hide all GPUs before any CUDA init
 torch.set_num_threads(4)                  # cap CPU threads to avoid PHP worker contention
 
-# ── Constants ────────────────────────────────────────────────
+# ── Constants ─────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH   = os.path.join(SCRIPT_DIR, 'best_seed456.pt')
 RF_MODEL_PATH   = os.path.join(SCRIPT_DIR, 'rf_severity_model.pkl')
 RF_ENCODER_PATH = os.path.join(SCRIPT_DIR, 'rf_label_encoder.pkl')
+UPLOAD_DIR    = os.path.normpath(os.path.join(SCRIPT_DIR, '..', 'uploads'))
 CONF_THRESH  = 0.25
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Fallback thresholds if RF model is unavailable
 SEVERITY_THRESHOLDS = {
@@ -497,9 +501,10 @@ def run_prediction(image_path):
                 "image_without_boxes": f"../uploads/{noboxes_filename}",
                 "class_overlays":      {},
                 "severity_source":     "rf" if _rf_model else "fallback",
+                "detections":          [],
+                "class_avg_confidence": {},
             }
-            print(json.dumps(output))
-            return
+            return output
 
         masks   = result.masks.data
         classes = result.boxes.cls.int()
@@ -533,6 +538,24 @@ def run_prediction(image_path):
         if severity not in RECOMMENDATIONS:
             severity = "Mild"
 
+        # ── Step 7b: Confidence data for Model Analysis modal ────
+        raw_confs   = result.boxes.conf.cpu().numpy().tolist()
+        raw_cls_ids = result.boxes.cls.int().cpu().numpy().tolist()
+
+        detections_data = [
+            {"class": names[int(c)], "confidence": round(float(cf), 4)}
+            for c, cf in zip(raw_cls_ids, raw_confs)
+        ]
+
+        _class_conf_map = {}
+        for d in detections_data:
+            _class_conf_map.setdefault(d["class"], []).append(d["confidence"])
+
+        class_avg_confidence = {
+            cls: round(sum(v) / len(v), 4)
+            for cls, v in _class_conf_map.items()
+        }
+
         # ── Step 8: Class overlay PNGs (fixed quality) ────────
         # Now passes leaf_bool + leaf_area for proper intersection
         overlay_urls = save_class_overlays(
@@ -550,16 +573,19 @@ def run_prediction(image_path):
             "severity_source":     severity_source,
             "leaf_area_px":        leaf_area,
             "dominant_symptom":    dominant_symptom,
+            "detections":          detections_data,
+            "class_avg_confidence": class_avg_confidence,
         }
 
-        print(json.dumps(output))
+        return output
 
     except Exception as e:
-        print(json.dumps({"error": str(e)}))
+        return {"error": str(e)}
 
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
-        run_prediction(sys.argv[1])
+        result = run_prediction(sys.argv[1])
+        print(json.dumps(result))
     else:
         print(json.dumps({"error": "No image path provided."}))

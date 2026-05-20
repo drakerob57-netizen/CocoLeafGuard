@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const formData = new FormData();
         formData.append('image', file);
 
-        fetch('process-image.php', { method: 'POST', body: formData })
+        fetch('http://localhost:8000/predict', { method: 'POST', body: formData })
             .then(r => r.json())
             .then(data => renderResultsState(file, data))
             .catch(err => {
@@ -266,12 +266,35 @@ document.addEventListener("DOMContentLoaded", function () {
                                 ${(apiResponse.recommendations || []).map(r => `<li>${r}</li>`).join('')}
                             </ul>
                         </div>
+
+                        <div class="text-center mt-4 pt-3" style="border-top:1px solid #e9ecef;">
+                            <button
+                                id="btn-model-analysis"
+                                style="border:1.5px solid #0d6efd;color:#0d6efd;background:transparent;
+                                       border-radius:20px;padding:7px 20px;font-weight:600;
+                                       font-size:0.85rem;cursor:pointer;transition:all .2s;">
+                                📊 Model Analysis
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
 
             // ── Initial render ────────────────────────────────
             renderCanvas(state);
+
+            // ── Model Analysis modal ──────────────────────────
+            document.getElementById('btn-model-analysis').addEventListener('click', () => {
+                openModelAnalysisModal(apiResponse);
+            });
+            document.getElementById('btn-model-analysis').addEventListener('mouseover', function () {
+                this.style.background = '#0d6efd';
+                this.style.color = '#fff';
+            });
+            document.getElementById('btn-model-analysis').addEventListener('mouseout', function () {
+                this.style.background = 'transparent';
+                this.style.color = '#0d6efd';
+            });
 
             // ── View toggle listeners ─────────────────────────
             const btnOriginal = document.getElementById('btn-original');
@@ -361,3 +384,276 @@ document.addEventListener("DOMContentLoaded", function () {
         reader.readAsDataURL(file);
     }
 });
+
+
+/* ════════════════════════════════════════════════════════════
+   MODEL ANALYSIS MODAL
+   Shows three Chart.js charts:
+     1. Confidence Distribution  — histogram of per-detection scores
+     2. Symptom Area Distribution — doughnut of % per symptom class
+     3. Confidence by Class       — horizontal bar, avg confidence
+════════════════════════════════════════════════════════════ */
+function openModelAnalysisModal(data) {
+    // Remove any stale modal from a previous analysis
+    const old = document.getElementById('model-analysis-modal');
+    if (old) old.remove();
+
+    const detections       = data.detections          || [];
+    const classAvgConf     = data.class_avg_confidence || {};
+    const symptoms         = data.symptoms             || [];
+    const severitySource   = data.severity_source      || 'N/A';
+    const leafAreaPx       = data.leaf_area_px          != null ? data.leaf_area_px.toLocaleString() : 'N/A';
+    const dominantSymptom  = data.dominant_symptom      || 'None';
+
+    // ── Build confidence histogram bins ───────────────────────
+    const BIN_SIZE   = 0.10;
+    const BIN_START  = 0.25;
+    const binLabels  = [];
+    const binCounts  = [];
+    for (let lo = BIN_START; lo < 1.0; lo = Math.round((lo + BIN_SIZE) * 100) / 100) {
+        const hi = Math.min(Math.round((lo + BIN_SIZE) * 100) / 100, 1.0);
+        binLabels.push(`${(lo * 100).toFixed(0)}–${(hi * 100).toFixed(0)}%`);
+        binCounts.push(detections.filter(d => d.confidence >= lo && d.confidence < hi).length);
+    }
+    // Put the 100% detections in the last bin
+    if (binCounts.length > 0) binCounts[binCounts.length - 1] +=
+        detections.filter(d => d.confidence >= 1.0).length;
+
+    // ── Symptom area donut data ───────────────────────────────
+    const symptomLabels  = symptoms.map(s => s.label);
+    const symptomPercents = symptoms.map(s => s.percent);
+    const symptomColors  = symptoms.map(s => s.color);
+
+    // ── Per-class confidence bar data ─────────────────────────
+    const classNames   = Object.keys(classAvgConf);
+    const classConfVals = Object.values(classAvgConf).map(v => (v * 100).toFixed(1));
+    const classColors  = classNames.map(name => {
+        const sym = symptoms.find(s => s.label.toLowerCase() === name.toLowerCase());
+        return sym ? sym.color : '#33B82F';
+    });
+
+    // ── No-detection state ────────────────────────────────────
+    const noDetHTML = `<p class="text-muted text-center py-3" style="font-size:.9rem;">
+        No detections — leaf appears healthy 🌿</p>`;
+
+    // ── Modal HTML ────────────────────────────────────────────
+    const modalEl = document.createElement('div');
+    modalEl.id = 'model-analysis-modal';
+    modalEl.innerHTML = `
+    <div class="modal fade" id="maModalDialog" tabindex="-1" aria-labelledby="maModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content" style="border-radius:14px;overflow:hidden;">
+
+          <!-- Header -->
+          <div class="modal-header" style="background:linear-gradient(135deg,#1a7a17,#33B82F);color:#fff;border:none;">
+            <div>
+              <h5 class="modal-title fw-bold mb-0" id="maModalLabel">📊 Model Analysis</h5>
+              <p class="mb-0 mt-1" style="font-size:.8rem;opacity:.85;">
+                Detailed confidence and distribution metrics from the AI inference
+              </p>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+
+          <!-- Meta strip -->
+          <div class="d-flex flex-wrap gap-3 px-4 py-3" style="background:#f8f9fa;border-bottom:1px solid #dee2e6;font-size:.82rem;">
+            <span>🔬 <strong>Severity Source:</strong> ${severitySource === 'rf' ? 'Random Forest' : 'Threshold Fallback'}</span>
+            <span>🍃 <strong>Leaf Area:</strong> ${leafAreaPx} px</span>
+            <span>🎯 <strong>Total Detections:</strong> ${detections.length}</span>
+            <span>📌 <strong>Dominant Symptom:</strong> ${dominantSymptom}</span>
+          </div>
+
+          <!-- Body: 3 chart sections -->
+          <div class="modal-body px-4 py-4">
+
+            <!-- Row 1: Confidence Distribution -->
+            <div class="mb-5">
+              <h6 class="fw-bold mb-1">1 · Confidence Distribution</h6>
+              <p class="text-muted mb-3" style="font-size:.82rem;">
+                How many YOLO detections fall in each confidence score bucket.
+                Taller bars at higher confidence indicate the model is more certain.
+              </p>
+              ${detections.length === 0 ? noDetHTML : `
+              <div style="position:relative;height:220px;">
+                <canvas id="chart-conf-dist"></canvas>
+              </div>`}
+            </div>
+
+            <!-- Row 2: Symptom Area + Confidence by Class side-by-side -->
+            <div class="row g-4">
+              <div class="col-md-5">
+                <h6 class="fw-bold mb-1">2 · Symptom Area Distribution</h6>
+                <p class="text-muted mb-3" style="font-size:.82rem;">
+                  Share of the total affected leaf area attributed to each disease class.
+                </p>
+                ${symptoms.length === 0 ? noDetHTML : `
+                <div style="position:relative;height:250px;">
+                  <canvas id="chart-symptom-area"></canvas>
+                </div>`}
+              </div>
+              <div class="col-md-7">
+                <h6 class="fw-bold mb-1">3 · Average Confidence by Class</h6>
+                <p class="text-muted mb-3" style="font-size:.82rem;">
+                  Mean YOLO confidence score across all detections for each disease class.
+                  Values closer to 100 % mean the model is highly certain.
+                </p>
+                ${classNames.length === 0 ? noDetHTML : `
+                <div style="position:relative;height:250px;">
+                  <canvas id="chart-class-conf"></canvas>
+                </div>`}
+              </div>
+            </div>
+
+          </div><!-- /modal-body -->
+
+          <div class="modal-footer" style="border-top:1px solid #dee2e6;">
+            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+
+    document.body.appendChild(modalEl);
+
+    const bsModal = new bootstrap.Modal(document.getElementById('maModalDialog'));
+    bsModal.show();
+
+    // Destroy charts when modal hides (prevents canvas reuse error on re-open)
+    document.getElementById('maModalDialog').addEventListener('hidden.bs.modal', () => {
+        ['chart-conf-dist', 'chart-symptom-area', 'chart-class-conf'].forEach(id => {
+            const c = Chart.getChart(id);
+            if (c) c.destroy();
+        });
+        modalEl.remove();
+    });
+
+    // Draw charts after the modal is fully shown (canvas must be visible)
+    document.getElementById('maModalDialog').addEventListener('shown.bs.modal', () => {
+        const gridLines = { color: 'rgba(0,0,0,0.06)' };
+        const tickFont  = { size: 11 };
+
+        // ── Chart 1: Confidence Distribution Histogram ────────
+        if (detections.length > 0) {
+            new Chart(document.getElementById('chart-conf-dist'), {
+                type: 'bar',
+                data: {
+                    labels: binLabels,
+                    datasets: [{
+                        label: 'Detections',
+                        data:  binCounts,
+                        backgroundColor: binCounts.map((_, i) => {
+                            const alpha = 0.55 + (i / binLabels.length) * 0.35;
+                            return `rgba(51,184,47,${alpha.toFixed(2)})`;
+                        }),
+                        borderColor: '#1a7a17',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.parsed.y} detection(s)`,
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Confidence Range', font: tickFont },
+                            grid:  gridLines,
+                            ticks: { font: tickFont },
+                        },
+                        y: {
+                            title: { display: true, text: 'Count', font: tickFont },
+                            grid:  gridLines,
+                            ticks: { font: tickFont, stepSize: 1 },
+                            beginAtZero: true,
+                        },
+                    },
+                },
+            });
+        }
+
+        // ── Chart 2: Symptom Area Doughnut ───────────────────
+        if (symptoms.length > 0) {
+            new Chart(document.getElementById('chart-symptom-area'), {
+                type: 'doughnut',
+                data: {
+                    labels: symptomLabels,
+                    datasets: [{
+                        data:            symptomPercents,
+                        backgroundColor: symptomColors,
+                        borderColor:     '#fff',
+                        borderWidth:     3,
+                        hoverOffset:     8,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '60%',
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { font: tickFont, padding: 14, usePointStyle: true },
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(1)}% of leaf area`,
+                            },
+                        },
+                    },
+                },
+            });
+        }
+
+        // ── Chart 3: Confidence by Class Horizontal Bar ───────
+        if (classNames.length > 0) {
+            new Chart(document.getElementById('chart-class-conf'), {
+                type: 'bar',
+                data: {
+                    labels: classNames,
+                    datasets: [{
+                        label: 'Avg Confidence (%)',
+                        data:  classConfVals,
+                        backgroundColor: classColors.map(c => c + 'CC'),
+                        borderColor:     classColors,
+                        borderWidth: 2,
+                        borderRadius: 5,
+                        barThickness: 36,
+                    }],
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.parsed.x}% avg confidence`,
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            min: 0,
+                            max: 100,
+                            title: { display: true, text: 'Avg Confidence (%)', font: tickFont },
+                            grid:  gridLines,
+                            ticks: { font: tickFont, callback: v => v + '%' },
+                        },
+                        y: {
+                            grid:  { display: false },
+                            ticks: { font: { size: 12, weight: '600' } },
+                        },
+                    },
+                },
+            });
+        }
+    });
+}
