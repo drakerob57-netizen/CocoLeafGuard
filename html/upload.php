@@ -13,8 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['leaf_image'])) {
             "status" => "Severe",
             "affected_area" => 99.6,
             "symptoms" => [
-                ["label" => "Yellowing", "percent" => 39.5, "color" => "#ffc107"],
-                ["label" => "Gray Spots", "percent" => 35.6, "color" => "#6c757d"],
+                ["label" => "Yellowing", "percent" => 39.5, "color" => "#28A745"],
+                ["label" => "Gray Spot", "percent" => 35.6, "color" => "#DC3545"],
                 ["label" => "Leaf Rots", "percent" => 20.2, "color" => "#dc3545"]
             ],
             "recommendations" => [

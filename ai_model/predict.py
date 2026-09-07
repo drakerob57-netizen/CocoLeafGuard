@@ -9,9 +9,9 @@ import joblib
 import numpy as np
 from ultralytics import YOLO
 
-# ── Force CPU — avoids CUDA OOM errors on web server environments ─
-os.environ["CUDA_VISIBLE_DEVICES"] = ""   # hide all GPUs before any CUDA init
-torch.set_num_threads(4)                  # cap CPU threads to avoid PHP worker contention
+# ── Enable CUDA GPU acceleration ─────────────────────────────────────
+# torch.cuda.is_available() will return True if CUDA is properly installed
+torch.set_num_threads(1)                  # reduce CPU thread contention when using GPU
 
 # ── Constants ─────────────────────────────────────────────────
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
@@ -19,45 +19,77 @@ MODEL_PATH   = os.path.join(SCRIPT_DIR, 'best_seed456.pt')
 RF_MODEL_PATH   = os.path.join(SCRIPT_DIR, 'rf_severity_model.pkl')
 RF_ENCODER_PATH = os.path.join(SCRIPT_DIR, 'rf_label_encoder.pkl')
 UPLOAD_DIR    = os.path.normpath(os.path.join(SCRIPT_DIR, '..', 'uploads'))
-CONF_THRESH  = 0.25
+CONF_THRESH  = 0.20
+MIN_AREA_RATIO = 0.15
+EDGE_MARGIN = 10
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# Fallback thresholds if RF model is unavailable
+# Affected-area thresholds used when the RF model is unavailable.
+# Values are fractions of the leaf area: <= 10% healthy, <= 30% mild,
+# <= 61% moderate, <= 85% severe, and anything higher is critical.
 SEVERITY_THRESHOLDS = {
-    "Severe":   0.50,
-    "Moderate": 0.15,
+    "Healthy":  0.10,
+    "Mild":     0.30,
+    "Moderate": 0.61,
+    "Severe":   0.85,
 }
 
 COLOR_MAP = {
-    "yellowing": "#FFC107",
-    "gray-spot": "#6C757D",
-    "gray spot": "#6C757D",
+    "yellowing": "#28A745",
+    "gray-spot": "#DC3545",
+    "gray spot": "#DC3545",
     "leaf rot":  "#A52A2A",
-    "leaf-rot":  "#A52A2A",
+    "leaf-rot":  "#A52A2A", 
 }
 
 # BGR format for OpenCV text
 LABEL_COLOR_MAP_BGR = {
-    "yellowing": (0, 193, 255),
-    "gray-spot": (117, 117, 108),
-    "gray spot": (117, 117, 108),
+    "yellowing": (69, 167, 40),
+    "gray-spot": (69, 53, 220),
+    "gray spot": (69, 53, 220),
     "leaf rot":  (42, 42, 165),
     "leaf-rot":  (42, 42, 165),
 }
 
 # RGBA overlay colors per class for transparent PNG overlays
 OVERLAY_COLOR_RGBA = {
-    "yellowing": (255, 193, 7,   160),
-    "gray-spot": (108, 117, 125, 160),
-    "gray spot": (108, 117, 125, 160),
+    "yellowing": (40, 167, 69, 160),
+    "gray-spot": (220, 53, 69, 160),
+    "gray spot": (220, 53, 69, 160),
     "leaf rot":  (165, 42,  42,  160),
     "leaf-rot":  (165, 42,  42,  160),
 }
 
+CLASS_NAME_ALIASES = {
+    "gray spot": "gray-spot",
+    "gray spots": "gray-spot",
+    "gray-spot": "gray-spot",
+    "gray_spot": "gray-spot",
+    "gray_spots": "gray-spot",
+    "yellowing": "yellowing",
+    "leaf rot": "leaf-rot",
+    "leaf rots": "leaf-rot",
+    "leaf-rot": "leaf-rot",
+    "leaf_rot": "leaf-rot",
+    "leaf_rots": "leaf-rot",
+}
+
+
+def canonical_class_name(class_name):
+    """Return the site label key for a model class name."""
+    safe_name = str(class_name).lower().strip().replace("_", " ")
+    return CLASS_NAME_ALIASES.get(safe_name, safe_name)
+
 RECOMMENDATIONS = {
+    "Critical": [
+        "Isolate affected palms immediately to prevent spread.",
+        "Apply treatment and seek expert consultation.",
+        "Increase monitoring frequency to every 3 days.",
+        "Document affected fronds for disease progression tracking.",
+    ],
     "Severe": [
         "Isolate affected palms immediately to prevent spread.",
-        "Apply appropriate fungicide or treatment as advised by an agronomist.",
+        "Apply treatment.",
         "Increase monitoring frequency to every 3 days.",
         "Document affected fronds for disease progression tracking.",
     ],
@@ -76,13 +108,48 @@ RECOMMENDATIONS = {
     ],
 }
 
+SYMPTOM_RECOMMENDATIONS = {
+    "gray-spot": [
+        "Remove and dispose of heavily spotted leaves away from healthy palms.",
+        "Improve airflow by avoiding overcrowding and keep foliage dry when watering.",
+        "Inspect nearby palms regularly for new gray spot lesions.",
+    ],
+    "yellowing": [
+        "Check soil drainage and moisture, since water stress can worsen yellowing.",
+        "Review palm nutrition, especially nitrogen, magnesium, and potassium levels.",
+        "Inspect roots and surrounding plants for signs of stress or disease.",
+    ],
+    "leaf-rot": [
+        "Remove severely rotted tissue with sanitized tools and dispose of it safely.",
+        "Reduce excess moisture and improve drainage around the palm.",
+        "Seek expert advice about an appropriate treatment if rot continues to spread.",
+    ],
+}
+
+
+def build_recommendations(symptoms, severity):
+    """Combine tailored guidance for every detected symptom with urgency advice."""
+    recommendations = []
+    for symptom in symptoms:
+        symptom_key = canonical_class_name(symptom["label"])
+        for recommendation in SYMPTOM_RECOMMENDATIONS.get(symptom_key, []):
+            if recommendation not in recommendations:
+                recommendations.append(recommendation)
+
+    urgency_guidance = RECOMMENDATIONS.get(severity, RECOMMENDATIONS["Healthy"])
+    for recommendation in urgency_guidance:
+        if recommendation not in recommendations:
+            recommendations.append(recommendation)
+
+    return recommendations
+
 # Canonical symptom classes expected by the RF model
 RF_SYMPTOM_CLASSES = ['gray-spot', 'yellowing']
 
 # ── Model loading — once at module level ─────────────────────
 try:
     _model = YOLO(MODEL_PATH)
-    _model.to('cpu')   # explicit CPU — avoids CUDA OOM on web servers
+    _model.to('cpu')   # use GPU for inference
 except Exception as e:
     _model = None
     _model_error = str(e)
@@ -149,6 +216,73 @@ def estimate_leaflet_area_dynamic(image_bgr):
         leaf_area = oh * ow
 
     return leaf_bool, leaf_area
+
+
+def compute_mask_area(mask):
+    """Return the number of foreground pixels in a binary mask."""
+    return int(np.asarray(mask, dtype=bool).sum())
+
+
+def compute_centroid(mask):
+    """Return the (x, y) centroid of foreground pixels in a binary mask."""
+    y_coords, x_coords = np.nonzero(np.asarray(mask, dtype=bool))
+    if len(x_coords) == 0:
+        return 0.0, 0.0
+    return float(x_coords.mean()), float(y_coords.mean())
+
+
+def is_partially_clipped(box, width, height):
+    """Return whether a bounding box touches the configured image margin."""
+    x_min, y_min, x_max, y_max = [float(value) for value in box]
+    return (
+        x_min < EDGE_MARGIN
+        or y_min < EDGE_MARGIN
+        or x_max > width - EDGE_MARGIN
+        or y_max > height - EDGE_MARGIN
+    )
+
+
+def select_primary_leaf(masks, boxes, width, height):
+    """Filter masks and select the valid mask closest to the image center."""
+    image_area = width * height
+    image_center = (width / 2, height / 2)
+    valid_leaves = []
+    small_area_count = 0
+    partially_clipped_count = 0
+
+    for index, (mask, box) in enumerate(zip(masks, boxes)):
+        area_pixels = compute_mask_area(mask)
+        area_ratio = area_pixels / image_area
+        if area_ratio < MIN_AREA_RATIO:
+            small_area_count += 1
+            continue
+
+        clipped = is_partially_clipped(box, width, height)
+        if clipped:
+            partially_clipped_count += 1
+
+        centroid = compute_centroid(mask)
+        distance = float(np.linalg.norm(
+            np.subtract(centroid, image_center)
+        ))
+        valid_leaves.append({
+            "index": index,
+            "centroid": centroid,
+            "area_pixels": area_pixels,
+            "area_ratio": area_ratio,
+            "distance_from_center": distance,
+            "partially_clipped": clipped,
+        })
+
+    selectable_leaves = [
+        leaf for leaf in valid_leaves if not leaf["partially_clipped"]
+    ]
+    selected_leaf = min(
+        selectable_leaves,
+        key=lambda leaf: leaf["distance_from_center"],
+        default=None,
+    )
+    return selected_leaf, valid_leaves, small_area_count, partially_clipped_count
 
 
 # ── RF Feature Extraction ─────────────────────────────────────
@@ -238,11 +372,16 @@ def predict_severity(feature_vector):
 
 def get_severity_fallback(affected_pct):
     """Simple threshold fallback when RF model is unavailable."""
-    if affected_pct > SEVERITY_THRESHOLDS["Severe"] * 100:
+    affected_fraction = affected_pct / 100
+    if affected_fraction > SEVERITY_THRESHOLDS["Severe"]:
+        return "Critical"
+    if affected_fraction > SEVERITY_THRESHOLDS["Moderate"]:
         return "Severe"
-    elif affected_pct > SEVERITY_THRESHOLDS["Moderate"] * 100:
+    if affected_fraction > SEVERITY_THRESHOLDS["Mild"]:
         return "Moderate"
-    return "Mild"
+    if affected_fraction > SEVERITY_THRESHOLDS["Healthy"]:
+        return "Mild"
+    return "Healthy"
 
 
 # ── Annotation helpers ────────────────────────────────────────
@@ -250,7 +389,10 @@ def draw_centroid_labels(annotated, masks, classes, names, leaflet_pixels):
     """Draw class + percentage labels at each mask centroid."""
     for i in range(len(classes)):
         cls_name     = names[int(classes[i])]
-        mask_np      = masks[i].cpu().numpy().astype(np.uint8)
+        mask_np      = masks[i].cpu().numpy().astype(np.float32)
+        if mask_np.shape != annotated.shape[:2]:
+            mask_np = cv2.resize(mask_np, (annotated.shape[1], annotated.shape[0]), interpolation=cv2.INTER_LINEAR)
+        mask_np = (mask_np >= 0.5).astype(np.uint8)
         affected_pct = round(mask_np.sum() / leaflet_pixels * 100, 1)
 
         if affected_pct < 0.3:
@@ -267,7 +409,7 @@ def draw_centroid_labels(annotated, masks, classes, names, leaflet_pixels):
         font       = cv2.FONT_HERSHEY_SIMPLEX
         font_scale = 0.52
         thickness  = 2
-        color_bgr  = LABEL_COLOR_MAP_BGR.get(cls_name.lower().strip(), (255, 255, 255))
+        color_bgr  = LABEL_COLOR_MAP_BGR.get(canonical_class_name(cls_name), (255, 255, 255))
 
         (tw, th), baseline = cv2.getTextSize(label_text, font, font_scale, thickness)
         x1 = max(cx - tw // 2, 0)
@@ -291,18 +433,43 @@ def save_with_boxes(result, save_path):
     """Full annotation — masks + bounding boxes + conf scores + labels."""
     annotated = result.plot(
         boxes=True, labels=True, conf=True,
-        masks=True, line_width=2,
+        masks=False, line_width=2,
     )
+    if result.masks is not None and len(result.masks) > 0:
+        mask_overlay = annotated.copy()
+        for i in range(len(result.masks.data)):
+            mask_np = result.masks.data[i].cpu().numpy().astype(np.float32)
+            if mask_np.shape != annotated.shape[:2]:
+                mask_np = cv2.resize(mask_np, (annotated.shape[1], annotated.shape[0]), interpolation=cv2.INTER_LINEAR)
+            cls_name = result.names[int(result.boxes.cls[i])]
+            color_bgr = LABEL_COLOR_MAP_BGR.get(canonical_class_name(cls_name), (100, 200, 100))
+            mask_overlay[mask_np >= 0.5] = color_bgr
+        annotated = cv2.addWeighted(mask_overlay, 0.45, annotated, 0.55, 0)
     cv2.imwrite(save_path, annotated)
 
 
 def save_without_boxes(result, save_path, leaflet_pixels):
     """Masks only with centroid labels — no bounding boxes."""
-    annotated = result.plot(
-        boxes=False, labels=False, conf=False,
-        masks=True, line_width=2,
-    )
+    annotated = result.orig_img.copy()
     if result.masks is not None and len(result.masks) > 0:
+        mask_overlay = annotated.copy()
+        for i in range(len(result.masks.data)):
+            mask_np = result.masks.data[i].cpu().numpy().astype(np.float32)
+            if mask_np.shape != annotated.shape[:2]:
+                mask_np = cv2.resize(mask_np, (annotated.shape[1], annotated.shape[0]), interpolation=cv2.INTER_LINEAR)
+            mask_np = mask_np >= 0.5
+            cls_name = result.names[int(result.boxes.cls[i])]
+            color_bgr = LABEL_COLOR_MAP_BGR.get(canonical_class_name(cls_name), (100, 200, 100))
+            mask_overlay[mask_np] = color_bgr
+        mask_pixels = result.masks.data
+        annotated = np.where(
+            np.any(np.stack([
+                cv2.resize(mask.cpu().numpy().astype(np.float32), (annotated.shape[1], annotated.shape[0]), interpolation=cv2.INTER_LINEAR) >= 0.5
+                for mask in mask_pixels
+            ]), axis=0)[..., None],
+            (mask_overlay * 0.45 + annotated * 0.55).astype(np.uint8),
+            annotated,
+        )
         annotated = draw_centroid_labels(
             annotated,
             result.masks.data,
@@ -372,42 +539,14 @@ def save_class_overlays(result, upload_dir, base_stem, leaf_bool, leaf_area):
         # which is the same intersection used in feature extraction.
         mask_np = (mask_np.astype(bool) & leaf_bool).astype(np.uint8)
 
-        safe_name = cls_name.lower().strip()
+        safe_name = canonical_class_name(cls_name)
         rgba      = OVERLAY_COLOR_RGBA.get(safe_name, (100, 200, 100, 160))
         canvas[mask_np == 1] = rgba
-
-        # Draw label at union centroid (using the cleaned mask)
-        M = cv2.moments(mask_np)
-        if M["m00"] > 0:
-            cx  = int(M["m10"] / M["m00"])
-            cy  = int(M["m01"] / M["m00"])
-            pct = round(mask_np.sum() / max(leaf_area, 1) * 100, 1)
-            lbl = f"{cls_name} {pct}%"
-
-            font       = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.52
-            thickness  = 2
-            bgr        = LABEL_COLOR_MAP_BGR.get(safe_name, (255, 255, 255))
-
-            (tw, th), baseline = cv2.getTextSize(lbl, font, font_scale, thickness)
-            x1 = max(cx - tw // 2, 0)
-            y1 = max(cy - th - baseline - 4, 0)
-            x2 = min(x1 + tw + 6, ow)
-            y2 = min(y1 + th + baseline + 6, oh)
-
-            canvas[y1:y2, x1:x2] = (0, 0, 0, 180)
-            cv2.putText(
-                canvas, lbl,
-                (x1 + 3, y2 - baseline - 2),
-                font, font_scale,
-                (bgr[0], bgr[1], bgr[2], 255),
-                thickness, cv2.LINE_AA,
-            )
 
         safe_filename    = cls_name.replace(" ", "_").replace("-", "_")
         overlay_filename = f"overlay_{safe_filename}_{base_stem}.png"
         overlay_filepath = os.path.join(upload_dir, overlay_filename)
-        cv2.imwrite(overlay_filepath, canvas)
+        cv2.imwrite(overlay_filepath, cv2.cvtColor(canvas, cv2.COLOR_RGBA2BGRA))
         overlay_urls[cls_name] = f"../uploads/{overlay_filename}"
 
     return overlay_urls
@@ -443,7 +582,7 @@ def compute_symptom_stats(masks, classes, names, leaf_bool, leaf_area):
         affected_px   = int(leaf_masked.sum())
         affected_pct  = affected_px / max(leaf_area, 1)
 
-        safe_name = cls_name.lower().strip()
+        safe_name = canonical_class_name(cls_name)
         symptoms.append({
             "label":   cls_name,
             "percent": round(affected_pct * 100, 2),
@@ -455,129 +594,142 @@ def compute_symptom_stats(masks, classes, names, leaf_bool, leaf_area):
     return symptoms
 
 
-# ── Main prediction entry point ───────────────────────────────
+def _decode_image_bytes(image_bytes):
+    image_array = np.frombuffer(image_bytes, dtype=np.uint8)
+    image_bgr = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if image_bgr is None:
+        raise ValueError("Could not decode image bytes")
+    return image_bgr
+
+
+def _run_prediction(image_bgr, upload_dir, base_stem):
+    if _model is None:
+        raise RuntimeError(f"YOLO model failed to load: {_model_error}")
+
+    os.makedirs(upload_dir, exist_ok=True)
+    boxes_filename   = f"analyzed_boxes_{base_stem}.png"
+    noboxes_filename = f"analyzed_noboxes_{base_stem}.png"
+    boxes_filepath   = os.path.join(upload_dir, boxes_filename)
+    noboxes_filepath = os.path.join(upload_dir, noboxes_filename)
+    oh, ow = image_bgr.shape[:2]
+
+    results = _model.predict(
+        source=image_bgr, conf=CONF_THRESH,
+        save=False, verbose=False, show_boxes=False,
+        device='cpu',
+    )
+    result = results[0]
+
+    leaf_bool, leaf_area = estimate_leaflet_area_dynamic(image_bgr)
+    save_with_boxes(result, boxes_filepath)
+    save_without_boxes(result, noboxes_filepath, leaf_area)
+
+    if result.masks is None or len(result.masks) == 0:
+        return {
+            "status":              "Healthy",
+            "affected_area":       0.0,
+            "leaf_area_px":        leaf_area,
+            "symptoms":            [],
+            "recommendations":     RECOMMENDATIONS["Healthy"],
+            "image_with_boxes":    f"../uploads/{boxes_filename}",
+            "image_without_boxes": f"../uploads/{noboxes_filename}",
+            "class_overlays":      {},
+            "severity_source":     "rf" if _rf_model else "fallback",
+            "detections":          [],
+            "class_avg_confidence": {},
+        }
+
+    masks   = result.masks.data
+    classes = result.boxes.cls.int()
+    names   = result.names
+
+    union_mask_torch = torch.any(masks, dim=0)
+    union_float      = union_mask_torch.float().cpu().numpy()
+    if union_float.shape != (oh, ow):
+        union_float = cv2.resize(union_float, (ow, oh), interpolation=cv2.INTER_LINEAR)
+    union_np            = (union_float >= 0.5).astype(np.uint8)
+    overall_leaf_masked = union_np.astype(bool) & leaf_bool
+    overall_pct         = overall_leaf_masked.sum() / max(leaf_area, 1) * 100
+
+    symptoms = compute_symptom_stats(masks, classes, names, leaf_bool, leaf_area)
+
+    feature_vector, dominant_symptom = extract_rf_features(
+        result, image_bgr, leaf_bool, leaf_area
+    )
+    severity = predict_severity(feature_vector)
+    severity_source = "rf"
+
+    if severity is None:
+        severity = get_severity_fallback(overall_pct)
+        severity_source = "fallback"
+
+    severity = severity.strip().capitalize()
+    if severity not in RECOMMENDATIONS:
+        severity = "Mild"
+
+    recommendations = build_recommendations(symptoms, severity)
+
+    raw_confs   = result.boxes.conf.cpu().numpy().tolist()
+    raw_cls_ids = result.boxes.cls.int().cpu().numpy().tolist()
+    detections_data = [
+        {"class": names[int(c)], "confidence": round(float(cf), 4)}
+        for c, cf in zip(raw_cls_ids, raw_confs)
+    ]
+
+    _class_conf_map = {}
+    for d in detections_data:
+        _class_conf_map.setdefault(d["class"], []).append(d["confidence"])
+
+    class_avg_confidence = {
+        cls: round(sum(v) / len(v), 4)
+        for cls, v in _class_conf_map.items()
+    }
+
+    overlay_urls = save_class_overlays(
+        result, upload_dir, base_stem, leaf_bool, leaf_area
+    )
+
+    return {
+        "status":              severity,
+        "affected_area":       round(overall_pct, 2),
+        "symptoms":            symptoms,
+        "recommendations":     recommendations,
+        "image_with_boxes":    f"../uploads/{boxes_filename}",
+        "image_without_boxes": f"../uploads/{noboxes_filename}",
+        "class_overlays":      overlay_urls,
+        "severity_source":     severity_source,
+        "leaf_area_px":        leaf_area,
+        "dominant_symptom":    dominant_symptom,
+        "detections":          detections_data,
+        "class_avg_confidence": class_avg_confidence,
+    }
+
+
 def run_prediction(image_path):
     try:
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"Image not found: {image_path}")
 
-        if _model is None:
-            raise RuntimeError(f"YOLO model failed to load: {_model_error}")
+        image_bgr = cv2.imread(image_path)
+        if image_bgr is None:
+            raise FileNotFoundError(f"Unable to read image: {image_path}")
 
         upload_dir = os.path.dirname(image_path)
-        base_name  = os.path.basename(image_path)
-        base_stem  = os.path.splitext(base_name)[0]
+        base_stem  = os.path.splitext(os.path.basename(image_path))[0]
+        return _run_prediction(image_bgr, upload_dir, base_stem)
 
-        boxes_filename   = f"analyzed_boxes_{base_name}"
-        noboxes_filename = f"analyzed_noboxes_{base_name}"
-        boxes_filepath   = os.path.join(upload_dir, boxes_filename)
-        noboxes_filepath = os.path.join(upload_dir, noboxes_filename)
+    except Exception as e:
+        return {"error": str(e)}
 
-        # ── Step 1: YOLO inference ────────────────────────────
-        results = _model.predict(
-            source=image_path, conf=CONF_THRESH,
-            save=False, verbose=False, show_boxes=False,
-            device='cpu',
-        )
-        result = results[0]
 
-        # ── Step 2: Dynamic HSV leaf area estimation ──────────
-        image_bgr            = cv2.imread(image_path)
-        leaf_bool, leaf_area = estimate_leaflet_area_dynamic(image_bgr)
-        oh, ow               = image_bgr.shape[:2]
-
-        # ── Step 3: Save annotated images ────────────────────
-        save_with_boxes(result, boxes_filepath)
-        save_without_boxes(result, noboxes_filepath, leaf_area)
-
-        # ── Step 4: Healthy — no masks detected ──────────────
-        if result.masks is None or len(result.masks) == 0:
-            output = {
-                "status":              "Healthy",
-                "affected_area":       0.0,
-                "symptoms":            [],
-                "recommendations":     RECOMMENDATIONS["Healthy"],
-                "image_with_boxes":    f"../uploads/{boxes_filename}",
-                "image_without_boxes": f"../uploads/{noboxes_filename}",
-                "class_overlays":      {},
-                "severity_source":     "rf" if _rf_model else "fallback",
-                "detections":          [],
-                "class_avg_confidence": {},
-            }
-            return output
-
-        masks   = result.masks.data
-        classes = result.boxes.cls.int()
-        names   = result.names
-
-        # ── Step 5: Overall affected area (leaf-relative) ─────
-        union_mask_torch = torch.any(masks, dim=0)
-        union_float      = union_mask_torch.float().cpu().numpy()
-        if union_float.shape != (oh, ow):
-            union_float = cv2.resize(union_float, (ow, oh),
-                                     interpolation=cv2.INTER_LINEAR)
-        union_np            = (union_float >= 0.5).astype(np.uint8)
-        overall_leaf_masked = union_np.astype(bool) & leaf_bool
-        overall_pct         = overall_leaf_masked.sum() / max(leaf_area, 1) * 100
-
-        # ── Step 6: Per-symptom stats (leaf-relative) ─────────
-        symptoms = compute_symptom_stats(masks, classes, names, leaf_bool, leaf_area)
-
-        # ── Step 7: RF severity prediction ───────────────────
-        feature_vector, dominant_symptom = extract_rf_features(
-            result, image_bgr, leaf_bool, leaf_area
-        )
-        severity = predict_severity(feature_vector)
-        severity_source = "rf"
-
-        if severity is None:
-            severity = get_severity_fallback(overall_pct)
-            severity_source = "fallback"
-
-        severity = severity.strip().capitalize()
-        if severity not in RECOMMENDATIONS:
-            severity = "Mild"
-
-        # ── Step 7b: Confidence data for Model Analysis modal ────
-        raw_confs   = result.boxes.conf.cpu().numpy().tolist()
-        raw_cls_ids = result.boxes.cls.int().cpu().numpy().tolist()
-
-        detections_data = [
-            {"class": names[int(c)], "confidence": round(float(cf), 4)}
-            for c, cf in zip(raw_cls_ids, raw_confs)
-        ]
-
-        _class_conf_map = {}
-        for d in detections_data:
-            _class_conf_map.setdefault(d["class"], []).append(d["confidence"])
-
-        class_avg_confidence = {
-            cls: round(sum(v) / len(v), 4)
-            for cls, v in _class_conf_map.items()
-        }
-
-        # ── Step 8: Class overlay PNGs (fixed quality) ────────
-        # Now passes leaf_bool + leaf_area for proper intersection
-        overlay_urls = save_class_overlays(
-            result, upload_dir, base_stem, leaf_bool, leaf_area
-        )
-
-        output = {
-            "status":              severity,
-            "affected_area":       round(overall_pct, 2),
-            "symptoms":            symptoms,
-            "recommendations":     RECOMMENDATIONS[severity],
-            "image_with_boxes":    f"../uploads/{boxes_filename}",
-            "image_without_boxes": f"../uploads/{noboxes_filename}",
-            "class_overlays":      overlay_urls,
-            "severity_source":     severity_source,
-            "leaf_area_px":        leaf_area,
-            "dominant_symptom":    dominant_symptom,
-            "detections":          detections_data,
-            "class_avg_confidence": class_avg_confidence,
-        }
-
-        return output
+def run_prediction_from_bytes(image_bytes, upload_dir=None, base_stem=None):
+    try:
+        image_bgr = _decode_image_bytes(image_bytes)
+        if upload_dir is None:
+            upload_dir = UPLOAD_DIR
+        if base_stem is None:
+            base_stem = f"frame_{int(time.time())}_{uuid.uuid4().hex[:8]}"
+        return _run_prediction(image_bgr, upload_dir, base_stem)
 
     except Exception as e:
         return {"error": str(e)}

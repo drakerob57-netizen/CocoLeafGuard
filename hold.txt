@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tool page</title>
+    <link href="../css/styles.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <style>
+        :root{
+            --leaf-green: #33B82F;
+            --leaf-green-dark: #279623;
+            --ink: #1f2937;
+            --muted: #6c757d;
+        }
+
+        /* ── Summary bar ───────────────────────────────── */
+        .summary-bar{ background:#fff; border-bottom:1px solid #e9ecef; }
+        .summary-stat{ display:flex; align-items:center; gap:10px; }
+        .summary-stat-icon{ width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+
+        .sev-badge{ display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:999px; font-size:.78rem; font-weight:600; }
+        .sev-dot{ width:7px; height:7px; border-radius:50%; display:inline-block; }
+
+        /* ── Layout ────────────────────────────────────── */
+        .assess-layout{ display:flex; gap:24px; align-items:flex-start; }
+        .assess-sidebar{ width:100%; max-width:380px; flex-shrink:0; }
+        .assess-detail{ flex:1; min-width:0; }
+        @media (max-width: 991px){
+            .assess-layout{ flex-direction:column; }
+            .assess-sidebar{ max-width:100%; }
+        }
+
+        .new-assessment-cta{
+            width:100%; border:2px dashed #a7e3a5; background:#eef9ee; border-radius:14px;
+            padding:16px; display:flex; align-items:center; gap:12px; text-align:left;
+            transition:.15s ease; cursor:pointer;
+        }
+        .new-assessment-cta:hover{ border-color:var(--leaf-green); background:#e2f5e1; }
+        .new-assessment-cta .icon-box{
+            width:38px; height:38px; border-radius:10px; background:var(--leaf-green); color:#fff;
+            display:flex; align-items:center; justify-content:center; flex-shrink:0;
+        }
+
+        /* ── Tree card ─────────────────────────────────── */
+        .tree-card{
+            width:100%; text-align:left; background:#fff; border:1px solid #e9ecef; border-radius:14px;
+            padding:14px 16px; margin-bottom:12px; cursor:pointer; transition:.15s ease;
+        }
+        .tree-card:hover{ border-color:#c9c9c9; box-shadow:0 2px 8px rgba(0,0,0,.05); }
+        .tree-card.selected{ border-color:#8fd98c; background:#f3fbf2; box-shadow:0 4px 14px rgba(51,184,47,.15); }
+        .tree-card .tree-icon{
+            width:34px; height:34px; border-radius:9px; background:#f1f1f1; color:#6c757d;
+            display:flex; align-items:center; justify-content:center; flex-shrink:0;
+        }
+        .tree-card.selected .tree-icon{ background:var(--leaf-green); color:#fff; }
+        .tree-card-meta{ display:flex; gap:14px; font-size:.75rem; color:#6c757d; margin-top:8px; flex-wrap:wrap; }
+        .tree-card-symptoms{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; text-align:center; margin-top:10px; padding-top:10px; border-top:1px solid #d9efd8; }
+
+        /* mini map */
+        .mini-map{ position:relative; height:140px; border-radius:12px; overflow:hidden;
+            background:linear-gradient(135deg,#ecfdf5,#ccfbf1); border:1px solid #e9ecef; margin-top:14px; }
+        .mini-map .grid-overlay{ position:absolute; inset:0; opacity:.25;
+            background-image:repeating-linear-gradient(0deg,#059669 0,#059669 1px,transparent 1px,transparent 28px),
+                              repeating-linear-gradient(90deg,#059669 0,#059669 1px,transparent 1px,transparent 28px); }
+        .mini-map-dot{ position:absolute; width:15px; height:15px; border-radius:50%; border:2px solid #fff;
+            box-shadow:0 1px 4px rgba(0,0,0,.3); cursor:pointer; transform:translate(-50%,-50%); transition:.15s; }
+        .mini-map-dot.selected{ transform:translate(-50%,-50%) scale(1.35); outline:2px solid var(--leaf-green); }
+        .mini-map-caption{ padding:8px 12px; font-size:.75rem; color:#6c757d; border-top:1px solid #eee; background:#fff; }
+
+        /* ── Detail panel ──────────────────────────────── */
+        .detail-panel{ background:#fff; border:1px solid #e9ecef; border-radius:18px; padding:26px; min-height:600px; }
+        .empty-detail{ display:flex; flex-direction:column; align-items:center; justify-content:center; height:420px; text-align:center; color:#adb5bd; }
+
+        .agg-card{ border-radius:14px; padding:20px; margin-bottom:22px; border:1px solid; }
+        .agg-progress{ height:10px; border-radius:999px; background:rgba(255,255,255,.6); overflow:hidden; }
+        .agg-progress > div{ height:100%; border-radius:999px; transition:width .8s ease; }
+
+        .symptom-row{ margin-bottom:14px; }
+        .symptom-row .bar-track{ height:6px; border-radius:999px; background:#f1f1f1; overflow:hidden; margin-top:6px; }
+        .symptom-row .bar-fill{ height:100%; border-radius:999px; transition:width .8s ease; }
+
+        .img-thumb{
+            position:relative; border-radius:12px; overflow:hidden; border:2px solid transparent; cursor:pointer;
+            height:100px; background:#eee;
+        }
+        .img-thumb img{ width:100%; height:100%; object-fit:cover; display:block; }
+        .img-thumb.selected{ border-color:var(--leaf-green); box-shadow:0 4px 12px rgba(0,0,0,.15); }
+        .img-thumb .thumb-badge{
+            position:absolute; bottom:6px; left:6px; right:6px; display:flex; justify-content:space-between;
+            font-size:.68rem; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.6);
+        }
+        .img-thumb .thumb-pct{ background:rgba(0,0,0,.45); padding:1px 7px; border-radius:999px; font-weight:600; }
+
+        .rec-box{ background:#eaf3ff; border:1px solid #cfe3fb; border-radius:14px; padding:18px; }
+        .rec-box li{ font-size:.88rem; color:#1e4f91; margin-bottom:6px; }
+
+        /* ── Modal / wizard ────────────────────────────── */
+        .modal-backdrop-custom{
+            position:fixed; inset:0; background:rgba(0,0,0,.5); backdrop-filter:blur(2px);
+            display:flex; align-items:center; justify-content:center; z-index:1055; padding:16px;
+        }
+        .wizard-box{
+            background:#fff; border-radius:18px; width:100%; max-width:560px; max-height:92vh;
+            display:flex; flex-direction:column; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,.3);
+        }
+        .wizard-header{ padding:22px 24px 18px; border-bottom:1px solid #f1f1f1; flex-shrink:0; }
+        .wizard-body{ padding:22px 24px; overflow-y:auto; }
+
+        .step-indicator{ display:flex; align-items:center; margin-top:14px; }
+        .step-indicator .step-node{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+        .step-indicator .step-circle{
+            width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+            font-size:.8rem; font-weight:700; background:#f1f1f1; color:#adb5bd;
+        }
+        .step-indicator .step-circle.active{ background:var(--leaf-green); color:#fff; box-shadow:0 0 0 4px #d9f2d8; }
+        .step-indicator .step-circle.done{ background:var(--leaf-green); color:#fff; }
+        .step-indicator .step-label{ font-size:.68rem; color:#adb5bd; }
+        .step-indicator .step-label.active{ color:var(--leaf-green-dark); font-weight:600; }
+        .step-indicator .step-connector{ flex:1; height:2px; background:#e9ecef; margin:0 8px 18px; border-radius:2px; }
+        .step-indicator .step-connector.done{ background:var(--leaf-green); }
+
+        .gps-map{
+            position:relative; height:140px; border-radius:12px 12px 0 0; overflow:hidden;
+            background:linear-gradient(135deg,#ecfdf5,#ccfbf1); display:flex; align-items:center; justify-content:center;
+            border:1px solid #e9ecef; border-bottom:none;
+        }
+        .gps-panel{ border:1px solid #e9ecef; border-radius:12px; overflow:hidden; }
+        .gps-controls{ padding:12px 16px; background:#fff; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+
+        .btn-leaf{ background:var(--leaf-green); border-color:var(--leaf-green); color:#fff; }
+        .btn-leaf:hover{ background:var(--leaf-green-dark); border-color:var(--leaf-green-dark); color:#fff; }
+        .btn-leaf:disabled{ background:#d9d9d9; border-color:#d9d9d9; color:#9a9a9a; }
+
+        .drop-zone{
+            border:2px dashed #dfe3e6; border-radius:14px; padding:40px 20px; text-align:center; cursor:pointer;
+            transition:.15s ease;
+        }
+        .drop-zone:hover, .drop-zone.dragging{ border-color:var(--leaf-green); background:#f3fbf2; }
+        .drop-zone .icon-circle{ width:56px; height:56px; border-radius:14px; background:#eef9ee; color:var(--leaf-green);
+            display:flex; align-items:center; justify-content:center; margin:0 auto 12px; font-size:1.4rem; }
+
+        .leaf-preview{ position:relative; border-radius:14px; overflow:hidden; border:1px solid #e9ecef; }
+        .leaf-preview img{ width:100%; height:210px; object-fit:cover; display:block; }
+        .leaf-preview .remove-btn{
+            position:absolute; top:10px; right:10px; background:rgba(255,255,255,.9); border:none; border-radius:50%;
+            width:28px; height:28px; display:flex; align-items:center; justify-content:center;
+        }
+        .leaf-preview .analyzing-overlay{
+            position:absolute; inset:0; background:rgba(0,0,0,.45); backdrop-filter:blur(2px);
+            display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#fff;
+        }
+        .leaf-preview .result-strip{
+            position:absolute; bottom:0; left:0; right:0; padding:12px; background:linear-gradient(to top, rgba(0,0,0,.7), transparent);
+            display:flex; align-items:center; gap:10px;
+        }
+        .spin{ animation:spin 1s linear infinite; }
+        @keyframes spin{ to{ transform:rotate(360deg); } }
+
+        .overlay-toggle-btn{
+            border:none; border-radius:20px; padding:6px 14px; font-size:.78rem; font-weight:600; cursor:pointer;
+            color:#fff !important; text-shadow:0 1px 2px rgba(0,0,0,.45); transition:opacity .2s, transform .1s;
+        }
+        .overlay-toggle-btn:hover{ transform:translateY(-1px); }
+    </style>
+</head>
+<body>
+<?php include 'header.php'; ?>
+
+<main class="bg-custom-off-white py-5 min-vh-100 reveal">
+    <div class="container text-center mb-4">
+        <h1 class="tool-title">Coconut Leaf Health Assessment</h1>
+        <p class="tool-subtitle">Walk each tree through a guided assessment &mdash; pin its GPS location, capture a leaf image, and get an AI-powered health analysis using YOLOv8-seg and Random Forest models.</p>
+    </div>
+
+    <!-- ── Session summary bar ─────────────────────────── -->
+    <div class="summary-bar mb-4">
+        <div class="container py-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div>
+                    <h2 class="h6 mb-0 fw-bold" id="summary-title">Inspection Session</h2>
+                    <p class="small text-muted mb-0" id="summary-subtitle">No trees assessed yet</p>
+                </div>
+                <div class="d-flex align-items-center gap-4 flex-wrap">
+                    <div class="summary-stat">
+                        <div class="summary-stat-icon" style="background:#eef9ee;color:var(--leaf-green);"><i class="bi bi-tree"></i></div>
+                        <div>
+                            <p class="mb-0 fw-bold" id="stat-trees">0</p>
+                            <p class="mb-0 small text-muted">Trees</p>
+                        </div>
+                    </div>
+                    <div class="summary-stat">
+                        <div class="summary-stat-icon" style="background:#eaf3ff;color:#0d6efd;"><i class="bi bi-images"></i></div>
+                        <div>
+                            <p class="mb-0 fw-bold" id="stat-images">0</p>
+                            <p class="mb-0 small text-muted">Images</p>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap" id="summary-sev-badges"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Main layout ─────────────────────────────────── -->
+    <div class="container">
+        <div class="assess-layout">
+
+            <!-- Sidebar: tree list -->
+            <div class="assess-sidebar" id="assess-sidebar">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h2 class="small fw-bold text-uppercase text-muted mb-0" style="letter-spacing:.05em;">Assessed Trees</h2>
+                    <span class="small text-muted bg-light px-2 py-1 rounded-pill" id="tree-count-badge">0 entries</span>
+                </div>
+
+                <button type="button" class="new-assessment-cta mb-3" onclick="openWizard()">
+                    <span class="icon-box"><i class="bi bi-plus-lg"></i></span>
+                    <span>
+                        <span class="d-block fw-semibold" style="color:#1b5e20;font-size:.9rem;">Add New Tree Assessment</span>
+                        <span class="d-block small" style="color:#3d8b3a;">GPS confirm &rarr; leaf capture &rarr; analyze</span>
+                    </span>
+                    <i class="bi bi-chevron-right ms-auto" style="color:#7cc57a;"></i>
+                </button>
+
+                <div id="tree-list"></div>
+
+                <div class="mini-map" id="mini-map" style="display:none;">
+                    <div class="grid-overlay"></div>
+                    <div id="mini-map-dots"></div>
+                </div>
+                <div class="mini-map-caption" id="mini-map-caption" style="display:none; border:1px solid #e9ecef; border-top:none; border-radius:0 0 12px 12px;">
+                    <i class="bi bi-geo-alt text-success"></i> <span id="mini-map-text">Inspection coverage</span>
+                </div>
+            </div>
+
+            <!-- Detail panel -->
+            <div class="assess-detail">
+                <div class="detail-panel" id="detail-panel">
+                    <div class="empty-detail">
+                        <i class="bi bi-tree" style="font-size:3.5rem;color:#e9ecef;"></i>
+                        <p class="mt-3 mb-0">Select a tree, or start a new assessment, to view details here.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Model info footer ──────────────────────────────── -->
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card p-4" style="background-color:#EBF8F2;border-color:#C3E6CB;color:#155724;border-radius:10px;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">YOLOv8-seg Segmentation</h6>
+                            <p class="small mb-0">Advanced instance segmentation identifies and isolates individual leaves, enabling precise disease localization.</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="fw-bold">Random Forest Classification</h6>
+                            <p class="small mb-0">Ensemble learning algorithm analyzes segmented regions to classify health status and disease types with high accuracy.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         WIZARD MODAL (new tree assessment)
+    ══════════════════════════════════════════════════════ -->
+    <div class="modal-backdrop-custom" id="wizard-backdrop" style="display:none;" onclick="if(event.target===this) closeWizard()">
+        <div class="wizard-box">
+            <div class="wizard-header">
+                <div class="d-flex align-items-start justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span style="width:28px;height:28px;border-radius:8px;background:var(--leaf-green);color:#fff;display:flex;align-items:center;justify-content:center;">
+                                <i class="bi bi-tree" style="font-size:.85rem;"></i>
+                            </span>
+                            <h3 class="h6 mb-0 fw-bold">New Tree Assessment</h3>
+                            <span class="small text-muted" id="wizard-tree-number">#1</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-light rounded-circle" onclick="closeWizard()"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <div class="step-indicator" id="step-indicator"></div>
+            </div>
+            <div class="wizard-body" id="wizard-body"></div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         ADD IMAGE MODAL (existing tree)
+    ══════════════════════════════════════════════════════ -->
+    <div class="modal-backdrop-custom" id="addimg-backdrop" style="display:none;" onclick="if(event.target===this) closeAddImageModal()">
+        <div class="wizard-box" style="max-width:520px;">
+            <div class="wizard-header d-flex align-items-center justify-content-between">
+                <div>
+                    <h3 class="h6 mb-0 fw-bold">Add Image</h3>
+                    <p class="small text-muted mb-0" id="addimg-subtitle">&nbsp;</p>
+                </div>
+                <button type="button" class="btn btn-sm btn-light rounded-circle" onclick="closeAddImageModal()"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="wizard-body" id="addimg-body"></div>
+        </div>
+    </div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+<script src="../javascript/index.js"></script>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════════════ */
+const API_ENDPOINT = 'http://localhost:8000/predict';
+
+let trees = [];              // {id, treeNumber, locationLabel, coordinates, inspectedAt, images:[{id,url,timestamp,result}], }
+let selectedTreeId = null;
+let selectedImageIdByTree = {};
+let captureTargetTreeId = null;
+
+let wizard = {
+    step: 'location',            // 'location' | 'leaf' | 'results'
+    coordinates: null,
+    locationLabel: '',
+    gpsLoading: false,
+    gpsError: null,
+    treePhoto: null,
+    leafImage: null,
+    leafFile: null,
+    analyzing: false,
+    result: null,
+    analyzeError: null,
+};
+
+const SEVERITY_ORDER = ['Healthy', 'Mild', 'Moderate', 'Severe', 'Critical'];
+
+const SEVERITY_STYLES = {
+    Healthy:  { bg:'#ECFDF5', border:'#A7F3D0', badgeBg:'#D1FAE5', badgeText:'#065F46', dot:'#10B981', bar:'#10B981' },
+    Mild:     { bg:'#FFFBEB', border:'#FDE68A', badgeBg:'#FEF3C7', badgeText:'#92400E', dot:'#F59E0B', bar:'#FBBF24' },
+    Moderate: { bg:'#FFF7ED', border:'#FED7AA', badgeBg:'#FFEDD5', badgeText:'#9A3412', dot:'#F97316', bar:'#FB923C' },
+    Severe:   { bg:'#FEF2F2', border:'#FECACA', badgeBg:'#FEE2E2', badgeText:'#991B1B', dot:'#EF4444', bar:'#F87171' },
+    Critical: { bg:'#FCE9E9', border:'#7a0000', badgeBg:'#7a0000', badgeText:'#ffffff', dot:'#7a0000', bar:'#7a0000' },
+};
+function sevStyle(level){ return SEVERITY_STYLES[level] || SEVERITY_STYLES.Healthy; }
+
+/* ════════════════════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════════════════════ */
+function esc(s){ return (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtTime(d){ return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+function fmtDate(d){ return d.toLocaleDateString([], {month:'short', day:'numeric', year:'numeric'}); }
+function uid(prefix){ return prefix + '-' + Date.now() + '-' + Math.floor(Math.random()*1000); }
+
+function severityBadgeHtml(level){
+    const c = sevStyle(level);
+    return `<span class="sev-badge" style="background:${c.badgeBg};color:${c.badgeText};">
+                <span class="sev-dot" style="background:${c.dot};"></span>${esc(level)}
+            </span>`;
+}
+
+function worstLevel(levels){
+    let idx = 0;
+    levels.forEach(l => { idx = Math.max(idx, SEVERITY_ORDER.indexOf(l)); });
+    return SEVERITY_ORDER[idx] || 'Healthy';
+}
+
+// Aggregate a tree's images into a single summary (average affected area,
+// worst-case severity, symptom percentages averaged per label).
+function aggregateTree(images){
+    if (!images.length){
+        return { affected_area: 0, status: 'Healthy', symptoms: [], recommendations: [] };
+    }
+    const avgArea = images.reduce((s, im) => s + (im.result.affected_area || 0), 0) / images.length;
+    const status = worstLevel(images.map(im => im.result.status));
+    const symptomMap = {};
+    images.forEach(im => (im.result.symptoms || []).forEach(s => {
+        if (!symptomMap[s.label]) symptomMap[s.label] = { label:s.label, color:s.color, total:0, count:0 };
+        symptomMap[s.label].total += (s.percent || 0);
+        symptomMap[s.label].count += 1;
+    }));
+    const symptoms = Object.values(symptomMap).map(s => ({ label:s.label, color:s.color, percent: s.total / s.count }));
+    // recommendations from the worst image found
+    const worstImg = images.slice().sort((a,b) => SEVERITY_ORDER.indexOf(b.result.status) - SEVERITY_ORDER.indexOf(a.result.status))[0];
+    return { affected_area: avgArea, status, symptoms, recommendations: worstImg.result.recommendations || [] };
+}
+
+/* ════════════════════════════════════════════════════════════
+   ANALYSIS CALL
+════════════════════════════════════════════════════════════ */
+async function analyzeImage(blob){
+    const formData = new FormData();
+    formData.append('image', blob, `leaf_${Date.now()}.jpg`);
+    const resp = await fetch(API_ENDPOINT, { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    // Normalise into the shape this UI expects
+    return {
+        status: data.status || 'Healthy',
+        affected_area: data.affected_area || 0,
+        symptoms: data.symptoms || [],
+        recommendations: data.recommendations || [],
+        image_without_boxes: data.image_without_boxes || null,
+        class_overlays: data.class_overlays || {},
+    };
+}
+
+/* ════════════════════════════════════════════════════════════
+   TOP-LEVEL RENDER
+════════════════════════════════════════════════════════════ */
+function render(){
+    renderSummaryBar();
+    renderTreeList();
+    renderMiniMap();
+    renderDetailPanel();
+}
+
+function renderSummaryBar(){
+    const totalImages = trees.reduce((s,t) => s + t.images.length, 0);
+    document.getElementById('summary-subtitle').textContent = trees.length
+        ? `${fmtDate(trees[0].inspectedAt)} \u00b7 ${trees.length} tree${trees.length!==1?'s':''} assessed`
+        : 'No trees assessed yet';
+    document.getElementById('stat-trees').textContent = trees.length;
+    document.getElementById('stat-images').textContent = totalImages;
+
+    const counts = {};
+    trees.forEach(t => { counts[t.aggregated.status] = (counts[t.aggregated.status]||0) + 1; });
+    const badges = document.getElementById('summary-sev-badges');
+    badges.innerHTML = SEVERITY_ORDER.filter(l => counts[l]).map(l => {
+        const c = sevStyle(l);
+        return `<span class="sev-badge" style="background:${c.badgeBg};color:${c.badgeText};"><span class="sev-dot" style="background:${c.dot};"></span>${counts[l]} ${l}</span>`;
+    }).join('');
+}
+
+function renderTreeList(){
+    document.getElementById('tree-count-badge').textContent = `${trees.length} entries`;
+    const list = document.getElementById('tree-list');
+    if (!trees.length){
+        list.innerHTML = `<p class="small text-muted text-center py-3">No trees yet &mdash; start your first assessment above.</p>`;
+        return;
+    }
+    list.innerHTML = trees.map(t => {
+        const c = sevStyle(t.aggregated.status);
+        const selected = t.id === selectedTreeId;
+        const symptomChips = (t.aggregated.symptoms || []).slice(0,3).map(s => `
+            <div>
+                <p class="small text-muted mb-0">${esc(s.label)}</p>
+                <p class="small fw-bold mb-0">${s.percent.toFixed(1)}%</p>
+            </div>`).join('');
+        return `
+        <div class="tree-card ${selected?'selected':''}" onclick="selectTree('${t.id}')">
+            <div class="d-flex align-items-start justify-content-between gap-2 mb-1">
+                <div class="d-flex align-items-center gap-2">
+                    ${t.photo ? `<img src="${t.photo}" alt="Tree #${t.treeNumber} photo" class="tree-icon" style="object-fit:cover;">` : `<span class="tree-icon"><i class="bi bi-tree"></i></span>`}
+                    <div>
+                        <p class="mb-0 fw-semibold small">Tree #${t.treeNumber}</p>
+                        <p class="mb-0 small text-muted">${esc(t.locationLabel)}</p>
+                    </div>
+                </div>
+                ${severityBadgeHtml(t.aggregated.status)}
+            </div>
+            <div class="tree-card-meta">
+                <span><i class="bi bi-clock"></i> ${fmtTime(t.inspectedAt)}</span>
+                <span><i class="bi bi-images"></i> ${t.images.length} image${t.images.length!==1?'s':''}</span>
+                ${t.coordinates ? `<span><i class="bi bi-geo-alt"></i> ${t.coordinates.lat.toFixed(4)}, ${t.coordinates.lng.toFixed(4)}</span>` : ''}
+            </div>
+            ${selected && symptomChips ? `<div class="tree-card-symptoms">${symptomChips}</div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function renderMiniMap(){
+    const map = document.getElementById('mini-map');
+    const caption = document.getElementById('mini-map-caption');
+    const withCoords = trees.filter(t => t.coordinates);
+    if (!withCoords.length){ map.style.display='none'; caption.style.display='none'; return; }
+    map.style.display=''; caption.style.display='';
+    document.getElementById('mini-map-text').textContent = `Inspection Coverage \u00b7 ${withCoords.length} GPS Waypoint${withCoords.length!==1?'s':''}`;
+    const dots = document.getElementById('mini-map-dots');
+    dots.innerHTML = withCoords.map((t,i) => {
+        const c = sevStyle(t.aggregated.status);
+        const left = 15 + (i * 17) % 75;
+        const top = 25 + (i % 2) * 40;
+        return `<div class="mini-map-dot ${t.id===selectedTreeId?'selected':''}" title="Tree #${t.treeNumber}"
+                    style="left:${left}%;top:${top}%;background:${c.dot};" onclick="selectTree('${t.id}')"></div>`;
+    }).join('');
+}
+
+function symptomRowHtml(sym, delay){
+    const color = sym.color || '#6c757d';
+    return `
+    <div class="symptom-row">
+        <div class="d-flex align-items-center justify-content-between small">
+            <span><span class="sev-dot" style="background:${color};margin-right:6px;"></span>${esc(sym.label)}</span>
+            <span class="fw-semibold">${sym.percent.toFixed(1)}%</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.min(sym.percent,100)}%;background:${color};"></div></div>
+    </div>`;
+}
+
+// Reusable thumbnail grid for a list of {id, url, result} images.
+// selectFnName is the name of a global function(imgId) to call on click.
+function imageGalleryHtml(images, selectedId, selectFnName){
+    return images.map((im, idx) => {
+        const ic = sevStyle(im.result.status);
+        return `<div class="img-thumb ${im.id===selectedId?'selected':''}" onclick="${selectFnName}('${im.id}')">
+            <img src="${im.url}" alt="Image ${idx+1}">
+            <div class="thumb-badge">
+                <span>#${idx+1}</span>
+                <span class="thumb-pct" style="background:${ic.dot};">${im.result.affected_area.toFixed(1)}%</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// Reusable "individual image" stats + symptom-filter/overlay card.
+function imageDetailHtml(im, idx){
+    const symptomBtns = (im.result.symptoms || []).map(s => `
+        <button type="button" class="overlay-toggle-btn active me-1 mb-1" style="background:${s.color};" data-class="${esc(s.label)}"
+            onclick="toggleOverlay(this,'${im.id}','${esc(s.label)}')">${esc(s.label)} &mdash; ${s.percent.toFixed(1)}%</button>`).join('');
+
+    return `
+    <div class="bg-white border rounded-4 p-4 mb-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <i class="bi bi-bar-chart text-muted"></i>
+            <h4 class="h6 fw-bold mb-0">Image #${idx+1} &middot; Individual Result</h4>
+            <span class="ms-auto small text-muted">${fmtTime(im.timestamp)}</span>
+        </div>
+        <div class="d-flex align-items-center gap-3 mb-3">
+            ${severityBadgeHtml(im.result.status)}
+            <span class="fs-4 fw-bold">${im.result.affected_area.toFixed(1)}%</span>
+            <span class="small text-muted">affected area</span>
+        </div>
+        ${im.result.image_without_boxes ? `
+        <div class="position-relative mb-3" id="overlay-container-${im.id}">
+            <img src="${im.result.image_without_boxes}" class="img-fluid rounded" alt="Analysis">
+            ${Object.entries(im.result.class_overlays || {}).map(([cls,url]) => `
+                <img src="${url}" class="img-fluid rounded position-absolute top-0 start-0 w-100 h-100"
+                     style="object-fit:cover;pointer-events:none;" data-overlay="${esc(cls)}"
+                     id="overlay-${im.id}-${esc(cls).replace(/\s+/g,'_').replace(/-/g,'_')}" alt="${esc(cls)} overlay">
+            `).join('')}
+        </div>` : ''}
+        ${symptomBtns ? `<div class="mb-3">${symptomBtns}</div>` : ''}
+        ${(im.result.symptoms||[]).map((s,i) => symptomRowHtml(s,i*0.05)).join('')}
+    </div>`;
+}
+
+function renderDetailPanel(){
+    const panel = document.getElementById('detail-panel');
+    const tree = trees.find(t => t.id === selectedTreeId);
+    if (!tree){
+        panel.innerHTML = `<div class="empty-detail">
+            <i class="bi bi-tree" style="font-size:3.5rem;color:#e9ecef;"></i>
+            <p class="mt-3 mb-0">Select a tree, or start a new assessment, to view details here.</p>
+        </div>`;
+        return;
+    }
+
+    const c = sevStyle(tree.aggregated.status);
+    if (!selectedImageIdByTree[tree.id] && tree.images.length) selectedImageIdByTree[tree.id] = tree.images[0].id;
+    const selImg = tree.images.find(im => im.id === selectedImageIdByTree[tree.id]) || tree.images[0];
+
+    const symptomRows = (tree.aggregated.symptoms || []).map((s,i) => symptomRowHtml(s, i*0.05)).join('');
+    const recRows = (tree.aggregated.recommendations || []).map(r => `<li>${esc(r)}</li>`).join('');
+
+    const thumbs = imageGalleryHtml(tree.images, selImg ? selImg.id : null, 'selectTreeDetailImage');
+    const selDetail = selImg ? imageDetailHtml(selImg, tree.images.indexOf(selImg)) : '';
+
+    panel.innerHTML = `
+        <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+            ${tree.photo ? `<img src="${tree.photo}" alt="Tree #${tree.treeNumber} photo" style="width:64px;height:64px;border-radius:14px;object-fit:cover;flex-shrink:0;border:1px solid #e9ecef;">` : ''}
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h2 class="h5 fw-bold mb-0">Tree #${tree.treeNumber}</h2>
+                    ${severityBadgeHtml(tree.aggregated.status)}
+                </div>
+                <div class="d-flex align-items-center gap-3 small text-muted mt-1 flex-wrap">
+                    <span><i class="bi bi-geo-alt"></i> ${esc(tree.locationLabel)}</span>
+                    <span><i class="bi bi-clock"></i> ${fmtDate(tree.inspectedAt)} &middot; ${fmtTime(tree.inspectedAt)}</span>
+                    ${tree.coordinates ? `<span class="text-muted">${tree.coordinates.lat.toFixed(4)}&deg;N, ${tree.coordinates.lng.toFixed(4)}&deg;E</span>` : ''}
+                </div>
+            </div>
+            <button type="button" class="btn btn-leaf btn-sm d-flex align-items-center gap-1" onclick="openAddImageModal('${tree.id}')">
+                <i class="bi bi-plus-lg"></i> Add Image
+            </button>
+        </div>
+
+        <div class="agg-card" style="background:${c.bg};border-color:${c.border};">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-layers"></i>
+                <h4 class="h6 fw-bold mb-0">Aggregated Assessment</h4>
+                <span class="ms-auto small text-muted">from ${tree.images.length} image${tree.images.length!==1?'s':''}</span>
+            </div>
+            <div class="d-flex align-items-center gap-4 mb-3 flex-wrap">
+                <div>
+                    <p class="display-6 fw-bold mb-0" style="color:${c.badgeText};">${tree.aggregated.affected_area.toFixed(1)}%</p>
+                    <p class="small text-muted mb-0">Overall affected area</p>
+                </div>
+                <div class="flex-grow-1" style="min-width:180px;">
+                    <div class="agg-progress"><div style="width:${Math.min(tree.aggregated.affected_area,100)}%;background:${c.bar};"></div></div>
+                    <div class="d-flex justify-content-between small text-muted mt-1"><span>0%</span><span>25%</span><span>50%</span><span>100%</span></div>
+                </div>
+            </div>
+            ${symptomRows}
+        </div>
+
+        <div class="mb-4">
+            <h4 class="h6 fw-bold mb-3">Captured Images <span class="fw-normal text-muted small">(${tree.images.length})</span></h4>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${thumbs}</div>
+        </div>
+
+        ${selDetail}
+
+        <div class="rec-box">
+            <h4 class="h6 fw-bold mb-2" style="color:#1e4f91;">Recommendations</h4>
+            <ul class="ps-3 mb-0">${recRows}</ul>
+        </div>
+    `;
+}
+
+function selectTree(id){
+    selectedTreeId = id;
+    render();
+}
+function selectTreeDetailImage(imgId){
+    selectedImageIdByTree[selectedTreeId] = imgId;
+    renderDetailPanel();
+}
+function toggleOverlay(btn, imgId, className){
+    btn.classList.toggle('active');
+    const safeId = className.replace(/\s+/g,'_').replace(/-/g,'_');
+    const el = document.getElementById(`overlay-${imgId}-${safeId}`);
+    if (el) el.style.display = btn.classList.contains('active') ? '' : 'none';
+}
+
+/* ════════════════════════════════════════════════════════════
+   WIZARD (new tree assessment)
+════════════════════════════════════════════════════════════ */
+function resetWizard(){
+    wizard = { step:'location', coordinates:null, locationLabel:'', gpsLoading:false, gpsError:null,
+               treePhoto:null, leafImage:null, leafFile:null, analyzing:false, result:null, analyzeError:null,
+               images:[], selectedImageId:null };
+}
+
+function openWizard(){
+    resetWizard();
+    document.getElementById('wizard-tree-number').textContent = `#${trees.length + 1}`;
+    document.getElementById('wizard-backdrop').style.display = 'flex';
+    renderWizard();
+}
+function closeWizard(){
+    document.getElementById('wizard-backdrop').style.display = 'none';
+}
+function wizardGoTo(step){ wizard.step = step; renderWizard(); }
+
+const WIZARD_STEPS = [
+    { id:'location', label:'Location' },
+    { id:'leaf', label:'Leaf Image' },
+    { id:'results', label:'Assessment' },
+];
+
+function renderStepIndicator(){
+    const idx = WIZARD_STEPS.findIndex(s => s.id === wizard.step);
+    document.getElementById('step-indicator').innerHTML = WIZARD_STEPS.map((s,i) => {
+        const done = i < idx, active = i === idx;
+        return `
+        <div class="step-node">
+            <div class="step-circle ${done?'done':''} ${active?'active':''}">${done ? '<i class="bi bi-check-lg"></i>' : i+1}</div>
+            <div class="step-label ${active?'active':''}">${s.label}</div>
+        </div>
+        ${i < WIZARD_STEPS.length-1 ? `<div class="step-connector ${done?'done':''}"></div>` : ''}`;
+    }).join('');
+}
+
+function renderWizard(){
+    renderStepIndicator();
+    const body = document.getElementById('wizard-body');
+    if (wizard.step === 'location') body.innerHTML = locationStepHtml();
+    else if (wizard.step === 'leaf') body.innerHTML = leafStepHtml();
+    else body.innerHTML = resultsStepHtml();
+    wireWizardEvents();
+}
+
+function locationStepHtml(){
+    return `
+    <h3 class="h6 fw-bold mb-1">Confirm Tree Location</h3>
+    <p class="small text-muted mb-3">Use your device's GPS to pin the exact position of the tree being assessed.</p>
+
+    <div class="gps-panel mb-4">
+        <div class="gps-map">
+            ${wizard.coordinates ? `
+                <div class="text-center">
+                    <i class="bi bi-geo-alt-fill" style="font-size:1.8rem;color:var(--leaf-green);"></i>
+                    <div><span class="badge bg-white text-success mt-1">${wizard.coordinates.lat.toFixed(5)}&deg;N, ${wizard.coordinates.lng.toFixed(5)}&deg;E</span></div>
+                </div>` : `
+                <div class="text-center text-muted">
+                    <i class="bi bi-compass" style="font-size:1.6rem;opacity:.5;"></i>
+                    <p class="small mb-0 mt-1">Waiting for GPS fix&hellip;</p>
+                </div>`}
+        </div>
+        <div class="gps-controls">
+            <div class="flex-grow-1">
+                ${wizard.coordinates ? `
+                    <p class="small fw-semibold mb-0">${esc(wizard.locationLabel)}</p>
+                    <p class="small text-muted mb-0">${wizard.coordinates.lat.toFixed(6)}, ${wizard.coordinates.lng.toFixed(6)}</p>`
+                    : `<p class="small text-muted mb-0">No location fixed yet</p>`}
+                ${wizard.gpsError ? `<p class="small text-danger mb-0 mt-1">${esc(wizard.gpsError)}</p>` : ''}
+            </div>
+            <button type="button" class="btn btn-leaf btn-sm d-flex align-items-center gap-1" id="btn-get-gps" ${wizard.gpsLoading?'disabled':''}>
+                ${wizard.gpsLoading ? '<i class="bi bi-arrow-repeat spin"></i> Locating&hellip;' : (wizard.coordinates ? '<i class="bi bi-arrow-repeat"></i> Refresh' : '<i class="bi bi-crosshair"></i> Get Position')}
+            </button>
+        </div>
+    </div>
+
+    <p class="small fw-semibold mb-2">Tree Photo <span class="fw-normal text-muted">(optional &mdash; for visual reference)</span></p>
+    ${wizard.treePhoto ? `
+        <div class="leaf-preview mb-3" style="height:150px;">
+            <img src="${wizard.treePhoto}" style="height:150px;">
+            <button type="button" class="remove-btn" id="btn-remove-tree-photo"><i class="bi bi-x"></i></button>
+        </div>` : `
+        <div class="drop-zone mb-3 py-3" id="tree-photo-zone" style="padding:16px;">
+            <div class="d-flex align-items-center gap-3 text-start">
+                <span class="icon-circle" style="width:44px;height:44px;font-size:1.1rem;margin:0;"><i class="bi bi-camera"></i></span>
+                <div>
+                    <p class="mb-0 small fw-semibold">Capture or upload tree photo</p>
+                    <p class="mb-0" style="font-size:.72rem;color:#adb5bd;">Helps confirm which tree is being assessed</p>
+                </div>
+            </div>
+        </div>`}
+    <input type="file" accept="image/*" capture="environment" id="tree-photo-input" style="display:none;">
+
+    <button type="button" class="btn btn-leaf w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2" id="btn-loc-next" ${!wizard.coordinates?'disabled':''}>
+        Confirm Location &amp; Continue <i class="bi bi-chevron-right"></i>
+    </button>
+    ${!wizard.coordinates ? `<p class="small text-center text-muted mt-2 mb-0">Tap "Get Position" first to confirm the tree location.</p>` : ''}
+    `;
+}
+
+function leafStepHtml(){
+    const addedCount = wizard.images.length;
+    const pendingReady = !!(wizard.result && !wizard.analyzing);
+    const totalCount = addedCount + (pendingReady ? 1 : 0);
+
+    const addedGallery = addedCount ? `
+        <div class="mb-3">
+            <p class="small fw-semibold mb-2">Added Images (${addedCount})</p>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                ${wizard.images.map((im, idx) => {
+                    const ic = sevStyle(im.result.status);
+                    return `<div class="img-thumb" style="height:84px;">
+                        <img src="${im.url}" alt="Image ${idx+1}">
+                        <div class="thumb-badge">
+                            <span>#${idx+1}</span>
+                            <span class="thumb-pct" style="background:${ic.dot};">${im.result.affected_area.toFixed(1)}%</span>
+                        </div>
+                        <button type="button" class="remove-btn" style="width:22px;height:22px;top:4px;right:4px;" onclick="removeWizardImage('${im.id}')">
+                            <i class="bi bi-x" style="font-size:.75rem;"></i>
+                        </button>
+                    </div>`;
+                }).join('')}
+            </div>
+        </div>` : '';
+
+    const captureArea = wizard.leafImage ? `
+        <div class="leaf-preview mb-2">
+            <img src="${wizard.leafImage}">
+            ${(!wizard.analyzing) ? `<button type="button" class="remove-btn" id="btn-remove-leaf"><i class="bi bi-x"></i></button>` : ''}
+            ${wizard.analyzing ? `
+                <div class="analyzing-overlay">
+                    <i class="bi bi-arrow-repeat spin" style="font-size:1.6rem;"></i>
+                    <p class="small mb-0 fw-semibold">Running YOLOv8-seg&hellip;</p>
+                    <p class="mb-0" style="font-size:.72rem;opacity:.8;">Random Forest classification</p>
+                </div>` : ''}
+            ${pendingReady ? `
+                <div class="result-strip">
+                    ${severityBadgeHtml(wizard.result.status)}
+                    <span class="text-white fw-semibold small">${wizard.result.affected_area.toFixed(1)}% affected</span>
+                </div>` : ''}
+        </div>
+        ${pendingReady ? `
+        <button type="button" class="btn btn-outline-success btn-sm w-100 mb-3 d-flex align-items-center justify-content-center gap-1" id="btn-add-image">
+            <i class="bi bi-plus-lg"></i> Add This Image &amp; Capture Another
+        </button>` : ''}` : `
+        <div class="drop-zone mb-3" id="leaf-drop-zone">
+            <div class="icon-circle"><i class="bi bi-upload"></i></div>
+            <p class="fw-semibold mb-1">Drop a leaf image here</p>
+            <p class="small text-muted mb-3">or click to browse / use camera</p>
+            <span class="btn btn-leaf btn-sm"><i class="bi bi-camera me-1"></i> Browse / Capture</span>
+        </div>`;
+
+    return `
+    <h3 class="h6 fw-bold mb-1">Capture Leaf Image${addedCount ? 's' : ''}</h3>
+    <p class="small text-muted mb-3">Upload or photograph coconut leaves from this tree. You can add several images before finishing.</p>
+
+    ${wizard.treePhoto ? `
+        <div class="d-flex align-items-center gap-3 p-2 bg-light rounded-3 mb-3">
+            <img src="${wizard.treePhoto}" style="width:44px;height:44px;border-radius:8px;object-fit:cover;">
+            <div>
+                <p class="mb-0 small fw-semibold">Assessing tree at</p>
+                <p class="mb-0 small text-muted">${esc(wizard.locationLabel)}</p>
+            </div>
+            <i class="bi bi-geo-alt text-success ms-auto"></i>
+        </div>` : ''}
+
+    ${addedGallery}
+    ${captureArea}
+    <input type="file" accept="image/*" capture="environment" id="leaf-file-input" style="display:none;">
+
+    ${wizard.analyzeError ? `<p class="small text-danger mt-2 mb-0">${esc(wizard.analyzeError)} &mdash; check that the analysis server is running.</p>` : ''}
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-1" id="btn-leaf-back"><i class="bi bi-arrow-left"></i> Back</button>
+        <button type="button" class="btn btn-leaf flex-grow-1 d-flex align-items-center justify-content-center gap-2" id="btn-leaf-next" ${(totalCount===0 || wizard.analyzing)?'disabled':''}>
+            ${wizard.analyzing ? '<i class="bi bi-arrow-repeat spin"></i> Analyzing&hellip;' : `<span>View Results${totalCount ? ` (${totalCount} image${totalCount!==1?'s':''})` : ''}</span> <i class="bi bi-chevron-right"></i>`}
+        </button>
+    </div>
+    ${totalCount===0 ? `<p class="small text-center text-muted mt-2 mb-0">Add at least one leaf image to continue.</p>` : ''}
+    `;
+}
+
+function resultsStepHtml(){
+    const agg = aggregateTree(wizard.images);
+    const c = sevStyle(agg.status);
+    const symptomRows = (agg.symptoms || []).map((s,i) => symptomRowHtml(s,i*0.05)).join('');
+    const recRows = (agg.recommendations || []).map(x => `<li class="d-flex gap-2"><span class="mt-1" style="width:5px;height:5px;border-radius:50%;background:#7aa7dd;flex-shrink:0;"></span>${esc(x)}</li>`).join('');
+
+    if (!wizard.selectedImageId || !wizard.images.find(im => im.id === wizard.selectedImageId)){
+        wizard.selectedImageId = wizard.images.length ? wizard.images[0].id : null;
+    }
+    const selImg = wizard.images.find(im => im.id === wizard.selectedImageId);
+    const gallery = wizard.images.length > 1 ? imageGalleryHtml(wizard.images, wizard.selectedImageId, 'selectWizardImage') : '';
+    const selDetail = selImg ? imageDetailHtml(selImg, wizard.images.indexOf(selImg)) : '';
+
+    return `
+    <h3 class="h6 fw-bold mb-1">Assessment Results</h3>
+    <p class="small text-muted mb-3">Tree #${trees.length+1} &middot; ${esc(wizard.locationLabel)} &middot; ${wizard.images.length} image${wizard.images.length!==1?'s':''}</p>
+
+    <div class="agg-card mb-3" style="background:${c.bg};border-color:${c.border};">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi ${agg.status==='Healthy'?'bi-check-circle':'bi-exclamation-triangle'}" style="font-size:1.6rem;color:${c.badgeText};"></i>
+                <div>
+                    <p class="fs-5 fw-bold mb-0" style="color:${c.badgeText};">${esc(agg.status)}</p>
+                    <p class="small text-muted mb-0">Overall severity classification</p>
+                </div>
+            </div>
+            <div class="text-end">
+                <p class="fs-3 fw-bold mb-0" style="color:${c.badgeText};">${agg.affected_area.toFixed(1)}%</p>
+                <p class="small text-muted mb-0">average affected area</p>
+            </div>
+        </div>
+        <div class="agg-progress mb-1"><div style="width:${Math.min(agg.affected_area,100)}%;background:${c.bar};"></div></div>
+        <div class="d-flex justify-content-between small text-muted"><span>Healthy</span><span>Mild</span><span>Moderate</span><span>Severe</span></div>
+        ${symptomRows ? `<div class="mt-3">${symptomRows}</div>` : ''}
+    </div>
+
+    ${wizard.images.length > 1 ? `
+    <div class="mb-3">
+        <p class="small fw-semibold mb-2">Captured Images (${wizard.images.length})</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${gallery}</div>
+    </div>` : ''}
+
+    ${selDetail}
+
+    <div class="rec-box mb-4">
+        <p class="small fw-semibold mb-2" style="color:#1e4f91;">Recommendations</p>
+        <ul class="ps-3 mb-0">${recRows}</ul>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-1" id="btn-add-more"><i class="bi bi-plus-lg"></i> Add More Images</button>
+        <button type="button" class="btn btn-leaf flex-grow-1 d-flex align-items-center justify-content-center gap-2" id="btn-finish"><i class="bi bi-flag-fill"></i> Finish Assessment</button>
+    </div>
+    `;
+}
+
+function wireWizardEvents(){
+    if (wizard.step === 'location'){
+        const gpsBtn = document.getElementById('btn-get-gps');
+        if (gpsBtn) gpsBtn.onclick = requestGPS;
+        const zone = document.getElementById('tree-photo-zone');
+        const input = document.getElementById('tree-photo-input');
+        if (zone) zone.onclick = () => input.click();
+        if (input) input.onchange = e => e.target.files[0] && readTreePhoto(e.target.files[0]);
+        const rm = document.getElementById('btn-remove-tree-photo');
+        if (rm) rm.onclick = () => { wizard.treePhoto = null; renderWizard(); };
+        const next = document.getElementById('btn-loc-next');
+        if (next) next.onclick = () => wizardGoTo('leaf');
+    } else if (wizard.step === 'leaf'){
+        const zone = document.getElementById('leaf-drop-zone');
+        const input = document.getElementById('leaf-file-input');
+        if (zone){
+            zone.onclick = () => input.click();
+            zone.ondragover = e => { e.preventDefault(); zone.classList.add('dragging'); };
+            zone.ondragleave = () => zone.classList.remove('dragging');
+            zone.ondrop = e => { e.preventDefault(); zone.classList.remove('dragging'); const f = e.dataTransfer.files[0]; if (f) handleLeafFile(f); };
+        }
+        if (input) input.onchange = e => e.target.files[0] && handleLeafFile(e.target.files[0]);
+        const rm = document.getElementById('btn-remove-leaf');
+        if (rm) rm.onclick = () => { wizard.leafImage = null; wizard.leafFile = null; wizard.result = null; wizard.analyzeError = null; renderWizard(); };
+        const addBtn = document.getElementById('btn-add-image');
+        if (addBtn) addBtn.onclick = () => { pushPendingImage(); renderWizard(); };
+        document.getElementById('btn-leaf-back').onclick = () => wizardGoTo('location');
+        document.getElementById('btn-leaf-next').onclick = () => {
+            pushPendingImage();
+            if (wizard.images.length === 0) return;
+            wizardGoTo('results');
+        };
+    } else {
+        const addMore = document.getElementById('btn-add-more');
+        if (addMore) addMore.onclick = () => wizardGoTo('leaf');
+        document.getElementById('btn-finish').onclick = finishWizard;
+    }
+}
+
+// Moves the currently-analyzed pending image into wizard.images, if any.
+function pushPendingImage(){
+    if (!wizard.result || !wizard.leafImage) return;
+    wizard.images.push({ id: uid('img'), url: wizard.leafImage, timestamp: new Date(), result: wizard.result });
+    wizard.leafImage = null;
+    wizard.leafFile = null;
+    wizard.result = null;
+    wizard.analyzeError = null;
+}
+function removeWizardImage(imgId){
+    wizard.images = wizard.images.filter(im => im.id !== imgId);
+    if (wizard.selectedImageId === imgId) wizard.selectedImageId = null;
+    renderWizard();
+}
+function selectWizardImage(imgId){
+    wizard.selectedImageId = imgId;
+    renderWizard();
+}
+
+function requestGPS(){
+    if (!navigator.geolocation){
+        wizard.gpsError = "Geolocation is not supported by this device.";
+        renderWizard();
+        return;
+    }
+    wizard.gpsLoading = true; wizard.gpsError = null; wizard.coordinates = null;
+    renderWizard();
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            const lat = pos.coords.latitude, lng = pos.coords.longitude;
+            wizard.gpsLoading = false;
+            wizard.coordinates = { lat, lng };
+            wizard.locationLabel = `Field \u00b7 ${lat.toFixed(4)}\u00b0N`;
+            renderWizard();
+        },
+        err => {
+            wizard.gpsLoading = false;
+            wizard.gpsError = "Couldn't get your location (" + err.message + "). Check location permissions and try again.";
+            renderWizard();
+        },
+        { timeout: 8000, enableHighAccuracy: true }
+    );
+}
+
+function readTreePhoto(file){
+    if (!file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => { wizard.treePhoto = e.target.result; renderWizard(); };
+    reader.readAsDataURL(file);
+}
+
+function handleLeafFile(file){
+    if (!file.type.startsWith('image/')) return;
+    wizard.leafFile = file;
+    wizard.result = null;
+    wizard.analyzeError = null;
+    const reader = new FileReader();
+    reader.onload = e => {
+        wizard.leafImage = e.target.result;
+        renderWizard();
+        runAnalysis();
+    };
+    reader.readAsDataURL(file);
+}
+
+async function runAnalysis(){
+    wizard.analyzing = true; renderWizard();
+    try {
+        wizard.result = await analyzeImage(wizard.leafFile);
+    } catch (e){
+        wizard.analyzeError = e.message || 'Analysis failed';
+    }
+    wizard.analyzing = false;
+    renderWizard();
+}
+
+function finishWizard(){
+    // Sweep in any analyzed-but-not-yet-added pending image first.
+    pushPendingImage();
+    if (!wizard.coordinates || wizard.images.length === 0) return;
+    const treeNumber = trees.length + 1;
+    const tree = {
+        id: uid('tree'),
+        treeNumber,
+        locationLabel: wizard.locationLabel || `Field \u00b7 Tree #${treeNumber}`,
+        coordinates: wizard.coordinates,
+        photo: wizard.treePhoto,
+        inspectedAt: new Date(),
+        images: wizard.images,
+    };
+    tree.aggregated = aggregateTree(tree.images);
+    trees.push(tree);
+    selectedTreeId = tree.id;
+    selectedImageIdByTree[tree.id] = tree.images[0].id;
+    closeWizard();
+    render();
+}
+
+/* ════════════════════════════════════════════════════════════
+   ADD IMAGE MODAL (existing tree)
+════════════════════════════════════════════════════════════ */
+let addImgState = { preview:null, file:null, analyzing:false, error:null };
+
+function openAddImageModal(treeId){
+    captureTargetTreeId = treeId;
+    addImgState = { preview:null, file:null, analyzing:false, error:null };
+    const tree = trees.find(t => t.id === treeId);
+    document.getElementById('addimg-subtitle').textContent = tree ? `Tree #${tree.treeNumber} \u00b7 ${tree.locationLabel}` : '';
+    document.getElementById('addimg-backdrop').style.display = 'flex';
+    renderAddImageModal();
+}
+function closeAddImageModal(){
+    document.getElementById('addimg-backdrop').style.display = 'none';
+    captureTargetTreeId = null;
+}
+
+function renderAddImageModal(){
+    const body = document.getElementById('addimg-body');
+    body.innerHTML = `
+    ${!addImgState.preview ? `
+        <div class="drop-zone" id="addimg-drop-zone">
+            <div class="icon-circle"><i class="bi bi-camera"></i></div>
+            <p class="fw-semibold mb-1">Drop an image or click to browse</p>
+            <p class="small text-muted mb-0">JPG, PNG &mdash; up to 10&nbsp;MB</p>
+        </div>` : `
+        <div class="leaf-preview mb-2">
+            <img src="${addImgState.preview}">
+            ${!addImgState.analyzing ? `<button type="button" class="remove-btn" id="addimg-remove"><i class="bi bi-x"></i></button>` : `
+                <div class="analyzing-overlay">
+                    <i class="bi bi-arrow-repeat spin" style="font-size:1.6rem;"></i>
+                    <p class="small mb-0 fw-semibold">Analyzing&hellip;</p>
+                </div>`}
+        </div>`}
+    <input type="file" accept="image/*" capture="environment" id="addimg-file-input" style="display:none;">
+    ${addImgState.error ? `<p class="small text-danger mt-2">${esc(addImgState.error)}</p>` : ''}
+    <button type="button" class="btn btn-leaf w-100 mt-3" id="addimg-analyze-btn" ${(!addImgState.preview || addImgState.analyzing)?'disabled':''}>
+        ${addImgState.analyzing ? 'Analyzing&hellip;' : 'Analyze &amp; Add to Tree'}
+    </button>
+    `;
+
+    const zone = document.getElementById('addimg-drop-zone');
+    const input = document.getElementById('addimg-file-input');
+    if (zone){
+        zone.onclick = () => input.click();
+        zone.ondragover = e => { e.preventDefault(); zone.classList.add('dragging'); };
+        zone.ondragleave = () => zone.classList.remove('dragging');
+        zone.ondrop = e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) addImgProcessFile(f); };
+    }
+    if (input) input.onchange = e => e.target.files[0] && addImgProcessFile(e.target.files[0]);
+    const rm = document.getElementById('addimg-remove');
+    if (rm) rm.onclick = () => { addImgState.preview=null; addImgState.file=null; renderAddImageModal(); };
+    const analyzeBtn = document.getElementById('addimg-analyze-btn');
+    if (analyzeBtn) analyzeBtn.onclick = addImgAnalyze;
+}
+
+function addImgProcessFile(file){
+    if (!file.type.startsWith('image/')) return;
+    addImgState.file = file;
+    addImgState.error = null;
+    const reader = new FileReader();
+    reader.onload = e => { addImgState.preview = e.target.result; renderAddImageModal(); };
+    reader.readAsDataURL(file);
+}
+
+async function addImgAnalyze(){
+    if (!addImgState.file || !captureTargetTreeId) return;
+    addImgState.analyzing = true; renderAddImageModal();
+    try {
+        const result = await analyzeImage(addImgState.file);
+        const tree = trees.find(t => t.id === captureTargetTreeId);
+        if (tree){
+            const image = { id: uid('img'), url: addImgState.preview, timestamp: new Date(), result };
+            tree.images.push(image);
+            tree.aggregated = aggregateTree(tree.images);
+            selectedImageIdByTree[tree.id] = image.id;
+        }
+        closeAddImageModal();
+        render();
+    } catch (e){
+        addImgState.error = (e.message || 'Analysis failed') + ' \u2014 check that the analysis server is running.';
+        addImgState.analyzing = false;
+        renderAddImageModal();
+    }
+}
+
+/* ════════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', render);
+</script>
+</body>
+</html>
