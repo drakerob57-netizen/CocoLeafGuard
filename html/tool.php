@@ -18,7 +18,7 @@
         <p class="tool-subtitle">Walk each tree through a guided assessment &mdash; pin its GPS location, capture a leaf image, and get an AI-powered health analysis using YOLOv8-seg and Random Forest models.</p>
     </div>
 
-    <!-- â”€â”€ Session summary bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+    <!--  Session summary bar -->
     <div class="summary-bar mb-4">
         <div class="container py-3">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -90,7 +90,7 @@
         </div>
     </div>
 
-    <!-- â”€â”€ Model info footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+    <!--  Model info footer  -->
     <div class="container mt-4">
         <div class="row">
             <div class="col-12">
@@ -110,9 +110,7 @@
         </div>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-         WIZARD MODAL (new tree assessment)
-    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!--  WIZARD MODAL (new tree assessment)  -->
     <div class="modal-backdrop-custom" id="wizard-backdrop" style="display:none;" onclick="if(event.target===this) closeWizard()">
         <div class="wizard-box">
             <div class="wizard-header">
@@ -134,9 +132,7 @@
         </div>
     </div>
 
-    <!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-         ADD IMAGE MODAL (existing tree)
-    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+    <!-- ADD IMAGE MODAL (existing tree) -->
     <div class="modal-backdrop-custom" id="addimg-backdrop" style="display:none;" onclick="if(event.target===this) closeAddImageModal()">
         <div class="wizard-box" style="max-width:520px;">
             <div class="wizard-header d-flex align-items-center justify-content-between">
@@ -173,6 +169,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="../javascript/index.js?v=20260825-assets4"></script>
+<script src="../javascript/index.js?v=20260908-camera-device"></script>
 </body>
 </html>

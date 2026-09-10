@@ -176,8 +176,8 @@ def estimate_leaflet_area_dynamic(image_bgr):
 
     # Broad initial green/yellow-green mask
     broad = (
-        ((h >= 18) & (h <= 100) & (s >= 20) & (v >= 20)) |
-        ((h >= 10) & (h <= 35)  & (s >= 30) & (v >= 30))
+        ((h >= 20) & (h <= 95) & (s >= 35) & (v >= 35)) |
+        ((h >= 18) & (h <= 42) & (s >= 50) & (v >= 35))
     )
 
     if broad.sum() > 50:
@@ -188,10 +188,14 @@ def estimate_leaflet_area_dynamic(image_bgr):
         v_min = max(0,   int(np.percentile(v[broad],  5)) - 10)
         v_max = min(255, int(np.percentile(v[broad], 95)) + 10)
     else:
-        h_min, h_max = 10, 100
-        s_min, s_max = 20, 255
-        v_min, v_max = 20, 255
+        h_min, h_max = 20, 95
+        s_min, s_max = 35, 255
+        v_min, v_max = 35, 255
 
+    h_min = max(h_min, 18)
+    h_max = min(h_max, 95)
+    s_min = max(s_min, 35)
+    v_min = max(v_min, 35)
     lower = np.array([h_min, s_min, v_min], dtype=np.uint8)
     upper = np.array([h_max, s_max, v_max], dtype=np.uint8)
     mask  = cv2.inRange(hsv, lower, upper)
@@ -201,11 +205,49 @@ def estimate_leaflet_area_dynamic(image_bgr):
     mask   = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     mask   = cv2.morphologyEx(mask, cv2.MORPH_OPEN,  kernel)
 
-    # Keep only the largest connected component
+    # Prefer the green component closest to the camera-centered main frond.
+    # Area remains part of the score so tiny green background fragments lose.
     n, labels, stats, _ = cv2.connectedComponentsWithStats(mask, 8)
     if n > 1:
-        largest = 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
-        mask    = (labels == largest).astype(np.uint8) * 255
+        image_center = np.array([ow / 2, oh / 2], dtype=np.float32)
+        max_distance = float(np.linalg.norm(image_center))
+        center_window = np.zeros((oh, ow), dtype=bool)
+        x_start, x_end = int(ow * 0.2), int(ow * 0.8)
+        y_start, y_end = int(oh * 0.2), int(oh * 0.8)
+        center_window[y_start:y_end, x_start:x_end] = True
+
+        component_scores = []
+        for component_id in range(1, n):
+            component = labels == component_id
+            area_ratio = stats[component_id, cv2.CC_STAT_AREA] / (oh * ow)
+            y_coords, x_coords = np.nonzero(component)
+            centroid = np.array([x_coords.mean(), y_coords.mean()])
+            center_score = 1.0 - min(
+                float(np.linalg.norm(centroid - image_center)) / max_distance,
+                1.0,
+            )
+            central_coverage = float((component & center_window).sum()) / max(
+                int(component.sum()), 1
+            )
+            score = (
+                0.35 * center_score
+                + 0.15 * min(area_ratio / 0.15, 1.0)
+                + 0.50 * central_coverage
+            )
+            component_scores.append((score, component_id))
+
+        selected_component = max(component_scores)[1]
+        mask = (labels == selected_component).astype(np.uint8) * 255
+
+        # Limit the selected component to the camera-centered focus ellipse so
+        # connected background fronds at the frame edges cannot become part of
+        # the primary leaf region.
+        y_grid, x_grid = np.ogrid[:oh, :ow]
+        normalized_distance = (
+            ((x_grid - ow / 2) / (ow * 0.48)) ** 2
+            + ((y_grid - oh / 2) / (oh * 0.48)) ** 2
+        )
+        mask[normalized_distance > 1.0] = 0
 
     leaf_bool = mask > 0
     leaf_area = int(leaf_bool.sum())
@@ -445,6 +487,31 @@ def save_with_boxes(result, save_path):
             color_bgr = LABEL_COLOR_MAP_BGR.get(canonical_class_name(cls_name), (100, 200, 100))
             mask_overlay[mask_np >= 0.5] = color_bgr
         annotated = cv2.addWeighted(mask_overlay, 0.45, annotated, 0.55, 0)
+
+    # Draw labels after the mask overlay so confidence text cannot be hidden.
+    for index, box in enumerate(result.boxes.xyxy.cpu().numpy()):
+        x_min, y_min, x_max, y_max = [int(value) for value in box]
+        cls_id = int(result.boxes.cls[index])
+        cls_name = result.names[cls_id]
+        confidence = float(result.boxes.conf[index])
+        label = f"{cls_name} {confidence:.2f}"
+        color_bgr = LABEL_COLOR_MAP_BGR.get(canonical_class_name(cls_name), (255, 255, 255))
+        cv2.rectangle(annotated, (x_min, y_min), (x_max, y_max), color_bgr, 2)
+        (text_width, text_height), baseline = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2
+        )
+        text_y = max(y_min, text_height + baseline + 4)
+        cv2.rectangle(
+            annotated,
+            (x_min, text_y - text_height - baseline - 4),
+            (min(x_min + text_width + 8, annotated.shape[1]), text_y),
+            (0, 0, 0),
+            -1,
+        )
+        cv2.putText(
+            annotated, label, (x_min + 4, text_y - baseline - 2),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.55, color_bgr, 2, cv2.LINE_AA,
+        )
     cv2.imwrite(save_path, annotated)
 
 
@@ -477,6 +544,54 @@ def save_without_boxes(result, save_path, leaflet_pixels):
             result.names,
             leaflet_pixels,
         )
+    cv2.imwrite(save_path, annotated)
+
+
+def save_hsv_leaf_debug(image_bgr, leaf_bool, save_path):
+    """Save the HSV-selected leaf region as a visible diagnostic image."""
+    highlighted = image_bgr.copy()
+    green_overlay = np.zeros_like(image_bgr)
+    green_overlay[:] = (40, 180, 40)
+    highlighted[leaf_bool] = cv2.addWeighted(
+        image_bgr[leaf_bool], 0.45, green_overlay[leaf_bool], 0.55, 0
+    )
+    contours, _ = cv2.findContours(
+        leaf_bool.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
+    cv2.drawContours(highlighted, contours, -1, (0, 255, 0), 3)
+    cv2.putText(
+        highlighted, "HSV selected leaf", (20, 35),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2, cv2.LINE_AA,
+    )
+    cv2.imwrite(save_path, highlighted)
+
+
+def save_yolo_raw_debug(result, save_path):
+    """Save raw YOLO masks and boxes before HSV overlap filtering."""
+    if result.masks is None or len(result.masks) == 0:
+        annotated = result.orig_img.copy()
+        cv2.putText(
+            annotated, "YOLO: no masks", (20, 35),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2, cv2.LINE_AA,
+        )
+        cv2.imwrite(save_path, annotated)
+        return
+
+    annotated = result.plot(boxes=True, labels=True, conf=True, masks=False)
+    mask_overlay = annotated.copy()
+    oh, ow = annotated.shape[:2]
+    for index, raw_mask in enumerate(result.masks.data):
+        mask_float = raw_mask.float().cpu().numpy()
+        if mask_float.shape != (oh, ow):
+            mask_float = cv2.resize(mask_float, (ow, oh), interpolation=cv2.INTER_LINEAR)
+        cls_name = result.names[int(result.boxes.cls[index])]
+        color_bgr = LABEL_COLOR_MAP_BGR.get(canonical_class_name(cls_name), (255, 255, 0))
+        mask_overlay[mask_float >= 0.5] = color_bgr
+    annotated = cv2.addWeighted(mask_overlay, 0.45, annotated, 0.55, 0)
+    cv2.putText(
+        annotated, "YOLO raw detections", (20, 35),
+        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 0), 2, cv2.LINE_AA,
+    )
     cv2.imwrite(save_path, annotated)
 
 
@@ -609,6 +724,8 @@ def _run_prediction(image_bgr, upload_dir, base_stem):
     os.makedirs(upload_dir, exist_ok=True)
     boxes_filename   = f"analyzed_boxes_{base_stem}.png"
     noboxes_filename = f"analyzed_noboxes_{base_stem}.png"
+    hsv_filename     = f"debug_hsv_leaf_{base_stem}.png"
+    yolo_raw_filename = f"debug_yolo_raw_{base_stem}.png"
     boxes_filepath   = os.path.join(upload_dir, boxes_filename)
     noboxes_filepath = os.path.join(upload_dir, noboxes_filename)
     oh, ow = image_bgr.shape[:2]
@@ -616,6 +733,7 @@ def _run_prediction(image_bgr, upload_dir, base_stem):
     results = _model.predict(
         source=image_bgr, conf=CONF_THRESH,
         save=False, verbose=False, show_boxes=False,
+        retina_masks=True,
         device='cpu',
     )
     result = results[0]
@@ -623,8 +741,112 @@ def _run_prediction(image_bgr, upload_dir, base_stem):
     leaf_bool, leaf_area = estimate_leaflet_area_dynamic(image_bgr)
     save_with_boxes(result, boxes_filepath)
     save_without_boxes(result, noboxes_filepath, leaf_area)
+    save_hsv_leaf_debug(image_bgr, leaf_bool, os.path.join(upload_dir, hsv_filename))
+    save_yolo_raw_debug(result, os.path.join(upload_dir, yolo_raw_filename))
+    debug_images = {
+        "hsv_leaf_mask": f"../uploads/{hsv_filename}",
+        "yolo_raw_detections": f"../uploads/{yolo_raw_filename}",
+    }
+
+    empty_filter_metadata = {
+        "selected_leaf": None,
+        "discarded_masks": {
+            "small_area": 0,
+            "partially_clipped": 0,
+        },
+    }
 
     if result.masks is None or len(result.masks) == 0:
+        return {
+            "status":              "Healthy",
+            "affected_area":       0.0,
+            "leaf_area_px":        leaf_area,
+            "symptoms":            [],
+            "recommendations":     [],
+            "image_with_boxes":    f"../uploads/{boxes_filename}",
+            "image_without_boxes": f"../uploads/{noboxes_filename}",
+            "class_overlays":      {},
+            "severity_source":     "rf" if _rf_model else "fallback",
+            "detections":          [],
+            "class_avg_confidence": {},
+            "debug_images":        debug_images,
+            **empty_filter_metadata,
+        }
+
+    # Select the camera-centered HSV leaf region. YOLO masks represent disease
+    # areas, so their size must not be used as a whole-leaf validity filter.
+    leaf_y, leaf_x = np.nonzero(leaf_bool)
+    if len(leaf_x) == 0:
+        return {
+            "status":              "no_valid_leaf_detected",
+            "affected_area":       0.0,
+            "leaf_area_px":        0,
+            "symptoms":            [],
+            "recommendations":     [],
+            "image_with_boxes":    f"../uploads/{boxes_filename}",
+            "image_without_boxes": f"../uploads/{noboxes_filename}",
+            "class_overlays":      {},
+            "severity_source":     None,
+            "detections":          [],
+            "class_avg_confidence": {},
+            "debug_images":        debug_images,
+            **empty_filter_metadata,
+        }
+
+    leaf_centroid = compute_centroid(leaf_bool)
+    leaf_distance = float(np.linalg.norm(
+        np.subtract(leaf_centroid, (ow / 2, oh / 2))
+    ))
+    filter_metadata = {
+        "selected_leaf": {
+            "centroid": [leaf_centroid[0], leaf_centroid[1]],
+            "area_pixels": leaf_area,
+            "area_ratio": leaf_area / (ow * oh),
+            "distance_from_center": leaf_distance,
+        },
+        "discarded_masks": {
+            "small_area": 0,
+            "partially_clipped": 0,
+        },
+    }
+
+    # Keep every disease mask, including small affected areas, but discard
+    # masks belonging to background fronds outside the selected leaf. The
+    # association region is dilated so red/brown lesions excluded by HSV can
+    # still be attributed to the nearby green leaf pixels.
+    raw_masks = result.masks.data
+    image_masks = []
+    for raw_mask in raw_masks:
+        mask_float = raw_mask.float().cpu().numpy()
+        if mask_float.shape != (oh, ow):
+            mask_float = cv2.resize(
+                mask_float, (ow, oh), interpolation=cv2.INTER_LINEAR
+            )
+        image_masks.append(mask_float >= 0.5)
+
+    raw_boxes = result.boxes.xyxy.cpu().numpy()
+    association_region = cv2.dilate(
+        leaf_bool.astype(np.uint8),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (31, 31)),
+    ).astype(bool)
+    analysis_region = association_region
+    selected_indices = []
+    partially_clipped_count = 0
+    for index, mask in enumerate(image_masks):
+        clipped = is_partially_clipped(raw_boxes[index], ow, oh)
+        if clipped:
+            partially_clipped_count += 1
+        x_min, y_min, x_max, y_max = raw_boxes[index]
+        box_center_x = int(np.clip((x_min + x_max) / 2, 0, ow - 1))
+        box_center_y = int(np.clip((y_min + y_max) / 2, 0, oh - 1))
+        near_selected_leaf = (
+            association_region[box_center_y, box_center_x]
+            or np.any(mask & association_region)
+        )
+        if near_selected_leaf and not clipped:
+            selected_indices.append(index)
+    filter_metadata["discarded_masks"]["partially_clipped"] = partially_clipped_count
+    if not selected_indices:
         return {
             "status":              "Healthy",
             "affected_area":       0.0,
@@ -634,11 +856,15 @@ def _run_prediction(image_bgr, upload_dir, base_stem):
             "image_with_boxes":    f"../uploads/{boxes_filename}",
             "image_without_boxes": f"../uploads/{noboxes_filename}",
             "class_overlays":      {},
-            "severity_source":     "rf" if _rf_model else "fallback",
+            "severity_source":     "fallback",
             "detections":          [],
             "class_avg_confidence": {},
+            "debug_images":        debug_images,
+            **filter_metadata,
         }
 
+    # Only disease masks belonging to the selected leaf reach analysis.
+    result = result[selected_indices]
     masks   = result.masks.data
     classes = result.boxes.cls.int()
     names   = result.names
@@ -648,13 +874,13 @@ def _run_prediction(image_bgr, upload_dir, base_stem):
     if union_float.shape != (oh, ow):
         union_float = cv2.resize(union_float, (ow, oh), interpolation=cv2.INTER_LINEAR)
     union_np            = (union_float >= 0.5).astype(np.uint8)
-    overall_leaf_masked = union_np.astype(bool) & leaf_bool
+    overall_leaf_masked = union_np.astype(bool) & analysis_region
     overall_pct         = overall_leaf_masked.sum() / max(leaf_area, 1) * 100
 
-    symptoms = compute_symptom_stats(masks, classes, names, leaf_bool, leaf_area)
+    symptoms = compute_symptom_stats(masks, classes, names, analysis_region, leaf_area)
 
     feature_vector, dominant_symptom = extract_rf_features(
-        result, image_bgr, leaf_bool, leaf_area
+        result, image_bgr, analysis_region, int(analysis_region.sum())
     )
     severity = predict_severity(feature_vector)
     severity_source = "rf"
@@ -686,7 +912,7 @@ def _run_prediction(image_bgr, upload_dir, base_stem):
     }
 
     overlay_urls = save_class_overlays(
-        result, upload_dir, base_stem, leaf_bool, leaf_area
+        result, upload_dir, base_stem, analysis_region, int(analysis_region.sum())
     )
 
     return {
@@ -702,6 +928,8 @@ def _run_prediction(image_bgr, upload_dir, base_stem):
         "dominant_symptom":    dominant_symptom,
         "detections":          detections_data,
         "class_avg_confidence": class_avg_confidence,
+        "debug_images":        debug_images,
+        **filter_metadata,
     }
 
 

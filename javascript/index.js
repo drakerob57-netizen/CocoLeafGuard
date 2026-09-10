@@ -144,6 +144,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const imageWithBoxes    = apiResponse.image_with_boxes    || rawImageUrl;
             const imageWithoutBoxes = apiResponse.image_without_boxes || rawImageUrl;
             const classOverlays     = apiResponse.class_overlays      || {};
+            const debugImages       = apiResponse.debug_images        || {};
             const symptoms          = apiResponse.symptoms            || [];
             const hasDetections     = symptoms.length > 0;
 
@@ -225,6 +226,25 @@ document.addEventListener("DOMContentLoaded", function () {
                             style="max-height:400px;max-width:100%;object-fit:contain;border-radius:8px;"
                             class="mb-4">
                         </canvas>
+
+                        <div class="w-100 text-start border-top pt-3 mb-3">
+                            <h6 class="fw-bold mb-2">Detection Diagnostics</h6>
+                            <p class="small text-muted mb-2">HSV leaf selection and raw YOLO output before filtering.</p>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <div class="small fw-semibold mb-1">HSV selected leaf</div>
+                                    ${debugImages.hsv_leaf_mask
+                                        ? `<img src="${debugImages.hsv_leaf_mask}" alt="HSV selected leaf" class="img-fluid rounded border">`
+                                        : '<div class="small text-muted">Unavailable</div>'}
+                                </div>
+                                <div class="col-6">
+                                    <div class="small fw-semibold mb-1">Raw YOLO detections</div>
+                                    ${debugImages.yolo_raw_detections
+                                        ? `<img src="${debugImages.yolo_raw_detections}" alt="Raw YOLO detections" class="img-fluid rounded border">`
+                                        : '<div class="small text-muted">Unavailable</div>'}
+                                </div>
+                            </div>
+                        </div>
 
                         <button class="btn btn-upload-different mt-auto" onclick="location.reload();">
                             Upload Different Image
@@ -458,7 +478,7 @@ function openModelAnalysisModal(data) {
     }));
 
     const detectedArea = symptoms.reduce((sum, symptom) => sum + (Number(symptom.percent) || 0), 0);
-    symptomLabels.push('Unaffected');
+    symptomLabels.push('Unclassified');
     symptomPercents.push(Math.max(0, 100 - detectedArea));
     symptomColors.push('#D9E0E5');
 
@@ -522,7 +542,7 @@ function openModelAnalysisModal(data) {
               <div class="col-md-5">
                 <h6 class="fw-bold mb-1">2 · Symptom Area Distribution</h6>
                 <p class="text-muted mb-3" style="font-size:.82rem;">
-                  Share of the total leaf area attributed to each disease class and unaffected tissue.
+                  Share of the total leaf area attributed to each disease class and unclassified tissue.
                 </p>
                 ${symptoms.length === 0 ? noDetHTML : `
                 <div style="position:relative;height:250px;">
@@ -695,6 +715,8 @@ let trees = [];              // {id, treeNumber, locationLabel, coordinates, ins
 let loadingTrees = true;     // true until the initial GET /trees finishes
 let selectedTreeId = null;
 let selectedImageIdByTree = {};
+let treePage = 1;
+let treePageSize = 10;
 let captureTargetTreeId = null;
 let miniMapInstance = null;
 
@@ -795,6 +817,7 @@ async function analyzeImage(blob){
         image_without_boxes: data.image_without_boxes || null,
         image_with_boxes: data.image_with_boxes || null,
         class_overlays: data.class_overlays || {},
+        debug_images: data.debug_images || {},
         detections: data.detections || [],
         class_avg_confidence: data.class_avg_confidence || {},
         severity_source: data.severity_source || 'N/A',
@@ -953,7 +976,11 @@ function renderTreeList(){
         list.innerHTML = `<p class="small text-muted text-center py-3">No trees yet &mdash; start your first assessment above.</p>`;
         return;
     }
-    list.innerHTML = trees.map(t => {
+    const pageCount = Math.max(1, Math.ceil(trees.length / treePageSize));
+    treePage = Math.min(treePage, pageCount);
+    const startIndex = (treePage - 1) * treePageSize;
+    const visibleTrees = trees.slice(startIndex, startIndex + treePageSize);
+    const treeCards = visibleTrees.map(t => {
         const c = sevStyle(t.aggregated.status);
         const selected = t.id === selectedTreeId;
         const symptomChips = (t.aggregated.symptoms || []).slice(0,3).map(s => `
@@ -982,6 +1009,37 @@ function renderTreeList(){
             ${selected && symptomChips ? `<div class="tree-card-symptoms">${symptomChips}</div>` : ''}
         </div>`;
     }).join('');
+    const pageButtons = Array.from({length: pageCount}, (_, index) => {
+        const page = index + 1;
+        return `<button type="button" class="btn btn-sm ${page === treePage ? 'btn-success' : 'btn-outline-secondary'}" data-tree-page="${page}">${page}</button>`;
+    }).join('');
+    list.innerHTML = `${treeCards}
+        <div class="d-flex align-items-center justify-content-between gap-2 mt-3 flex-wrap">
+            <label class="small text-muted d-flex align-items-center gap-1 mb-0">
+                Show
+                <select class="form-select form-select-sm" id="tree-page-size" style="width:auto;">
+                    ${[10, 20, 50].map(size => `<option value="${size}" ${size === treePageSize ? 'selected' : ''}>${size}</option>`).join('')}
+                </select>
+                entries
+            </label>
+            <div class="btn-group" role="group" aria-label="Tree pages">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-tree-page="${Math.max(1, treePage - 1)}" ${treePage === 1 ? 'disabled' : ''}>&laquo;</button>
+                ${pageButtons}
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-tree-page="${Math.min(pageCount, treePage + 1)}" ${treePage === pageCount ? 'disabled' : ''}>&raquo;</button>
+            </div>
+        </div>`;
+    list.querySelectorAll('[data-tree-page]').forEach(button => {
+        button.onclick = () => {
+            treePage = Number(button.dataset.treePage);
+            renderTreeList();
+        };
+    });
+    const pageSizeSelect = document.getElementById('tree-page-size');
+    if (pageSizeSelect) pageSizeSelect.onchange = event => {
+        treePageSize = Number(event.target.value);
+        treePage = 1;
+        renderTreeList();
+    };
 }
 
 function renderMiniMap(){
@@ -1334,19 +1392,19 @@ function imageDetailHtml(im, idx){
         ${im.url ? `
         <div class="position-relative mb-3" id="overlay-container-${im.id}">
             <img src="${im.url}" class="img-fluid rounded w-100" alt="Original leaf image">
-            ${im.result.image_without_boxes ? `<button type="button" class="yolo-mask-icon-btn" id="yolo-mask-btn-${im.id}"
-                title="Show actual YOLO mask" aria-label="Show actual YOLO mask"
+            ${im.result.image_with_boxes ? `<button type="button" class="yolo-mask-icon-btn" id="yolo-mask-btn-${im.id}"
+                title="Show YOLO boxes and confidence" aria-label="Show YOLO boxes and confidence"
                 onclick="toggleYoloMask(this,'${im.id}')"><i class="bi bi-eye"></i></button>` : ''}
             ${Object.entries(im.result.class_overlays || {}).map(([cls,url]) => `
                 <img src="${url}${url.includes('?') ? '&' : '?'}v=${encodeURIComponent(im.timestamp)}" class="rounded position-absolute top-0 start-0 w-100 h-100"
                      style="object-fit:fill;pointer-events:none;" data-overlay="${esc(cls)}"
                      id="overlay-${im.id}-${esc(cls).replace(/\s+/g,'_').replace(/-/g,'_')}" alt="${esc(cls)} overlay">
             `).join('')}
-            ${im.result.image_without_boxes ? `
-                <img src="${im.result.image_without_boxes}?v=${encodeURIComponent(im.timestamp)}"
+            ${im.result.image_with_boxes ? `
+                <img src="${im.result.image_with_boxes}?v=${encodeURIComponent(im.timestamp)}"
                      class="rounded position-absolute top-0 start-0 w-100 h-100"
                      style="object-fit:fill;pointer-events:none;display:none;"
-                     id="yolo-mask-${im.id}" alt="Actual YOLO mask">
+                     id="yolo-mask-${im.id}" alt="YOLO boxes and confidence">
             ` : ''}
         </div>` : ''}
         ${symptomBtns ? `<div class="mb-3">${symptomBtns}</div>` : ''}
@@ -1669,7 +1727,8 @@ function toggleYoloMask(btn, imgId){
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 function resetWizard(){
     wizard = { step:'location', coordinates:null, locationLabel:'', gpsLoading:false, gpsError:null,
-               treePhoto:null, leafImage:null, leafFile:null, analyzing:false, result:null, analyzeError:null,
+               treePhoto:null, leafImage:null, leafFile:null, hsvPreview:null, hsvPreviewData:null,
+               analyzing:false, result:null, analyzeError:null,
                images:[], selectedImageId:null, saving:false, saveError:null };
 }
 
@@ -1757,9 +1816,14 @@ function locationStepHtml(){
                     <p class="mb-0 small fw-semibold">Capture or upload tree photo</p>
                     <p class="mb-0" style="font-size:.72rem;color:#adb5bd;">Helps confirm which tree is being assessed</p>
                 </div>
+                <div class="d-flex gap-2 mt-3">
+                    <button type="button" class="btn btn-leaf capture-choice-btn btn-sm" id="tree-photo-camera-btn"><i class="bi bi-camera me-1"></i> Use Camera</button>
+                    <button type="button" class="btn btn-outline-secondary capture-choice-btn btn-sm" id="tree-photo-file-btn"><i class="bi bi-folder2-open me-1"></i> Choose File</button>
+                </div>
             </div>
         </div>`}
-    <input type="file" accept="image/*" capture="environment" id="tree-photo-input" style="display:none;">
+    <input type="file" accept="image/*" capture="environment" id="tree-photo-camera-input" style="display:none;">
+    <input type="file" accept="image/*" id="tree-photo-file-input" style="display:none;">
 
     <button type="button" class="btn btn-leaf w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2" id="btn-loc-next" ${!wizard.coordinates?'disabled':''}>
         Confirm Location &amp; Continue <i class="bi bi-chevron-right"></i>
@@ -1795,7 +1859,7 @@ function leafStepHtml(){
 
     const captureArea = wizard.leafImage ? `
         <div class="leaf-preview mb-2">
-            <img src="${wizard.leafImage}">
+            <img src="${wizard.hsvPreview ? wizard.hsvPreview : wizard.leafImage}" alt="${wizard.hsvPreview ? 'HSV threshold preview' : 'Leaf image'}">
             ${(!wizard.analyzing) ? `<button type="button" class="remove-btn" id="btn-remove-leaf"><i class="bi bi-x"></i></button>` : ''}
             ${wizard.analyzing ? `
                 <div class="analyzing-overlay">
@@ -1809,6 +1873,9 @@ function leafStepHtml(){
                     <span class="text-white fw-semibold small">${wizard.result.affected_area.toFixed(1)}% affected</span>
                 </div>` : ''}
         </div>
+            <button type="button" class="btn btn-outline-success btn-sm w-100 mb-3 d-flex align-items-center justify-content-center gap-1" id="btn-toggle-hsv">
+                <i class="bi bi-eye"></i> ${wizard.hsvPreview ? 'Show Original Image' : 'Show HSV Threshold'}
+            </button>
         ${pendingReady ? `
         <button type="button" class="btn btn-outline-success btn-sm w-100 mb-3 d-flex align-items-center justify-content-center gap-1" id="btn-add-image">
             <i class="bi bi-plus-lg"></i> Add This Image &amp; Capture Another
@@ -1816,8 +1883,11 @@ function leafStepHtml(){
         <div class="drop-zone mb-3" id="leaf-drop-zone">
             <div class="icon-circle"><i class="bi bi-upload"></i></div>
             <p class="fw-semibold mb-1">Drop a leaf image here</p>
-            <p class="small text-muted mb-3">or click to browse / use camera</p>
-            <span class="btn btn-leaf btn-sm"><i class="bi bi-camera me-1"></i> Browse / Capture</span>
+            <p class="small text-muted mb-3">Choose how to provide the image</p>
+            <div class="d-flex justify-content-center gap-2">
+                <button type="button" class="btn btn-leaf capture-choice-btn btn-sm" id="leaf-camera-btn"><i class="bi bi-camera me-1"></i> Use Camera</button>
+                <button type="button" class="btn btn-outline-secondary capture-choice-btn btn-sm" id="leaf-file-btn"><i class="bi bi-folder2-open me-1"></i> Choose File</button>
+            </div>
         </div>`;
 
     return `
@@ -1836,7 +1906,8 @@ function leafStepHtml(){
 
     ${addedGallery}
     ${captureArea}
-    <input type="file" accept="image/*" capture="environment" id="leaf-file-input" style="display:none;">
+    <input type="file" accept="image/*" capture="environment" id="leaf-camera-input" style="display:none;">
+    <input type="file" accept="image/*" id="leaf-file-input" style="display:none;">
 
     ${wizard.analyzeError ? `<p class="small text-danger mt-2 mb-0">${esc(wizard.analyzeError)} &mdash; check that the analysis server is running.</p>` : ''}
 
@@ -1854,7 +1925,6 @@ function resultsStepHtml(){
     const agg = aggregateTree(wizard.images);
     const c = sevStyle(agg.status);
     const symptomRows = (agg.symptoms || []).map((s,i) => symptomRowHtml(s,i*0.05)).join('');
-    const recRows = (agg.recommendations || []).map(x => `<li class="d-flex gap-2"><span class="mt-1" style="width:5px;height:5px;border-radius:50%;background:#7aa7dd;flex-shrink:0;"></span>${esc(x)}</li>`).join('');
 
     if (!wizard.selectedImageId || !wizard.images.find(im => im.id === wizard.selectedImageId)){
         wizard.selectedImageId = wizard.images.length ? wizard.images[0].id : null;
@@ -1893,11 +1963,6 @@ function resultsStepHtml(){
 
     ${selDetail}
 
-    <div class="rec-box mb-4">
-        <p class="small fw-semibold mb-2" style="color:#1e4f91;">Recommendations</p>
-        <ul class="ps-3 mb-0">${recRows}</ul>
-    </div>
-
     <div class="d-flex gap-2">
         <button type="button" class="btn btn-outline-secondary d-flex align-items-center gap-1" id="btn-add-more" ${wizard.saving?'disabled':''}><i class="bi bi-plus-lg"></i> Add More Images</button>
         <button type="button" class="btn btn-leaf flex-grow-1 d-flex align-items-center justify-content-center gap-2" id="btn-finish" ${wizard.saving?'disabled':''}>
@@ -1913,25 +1978,45 @@ function wireWizardEvents(){
         const gpsBtn = document.getElementById('btn-get-gps');
         if (gpsBtn) gpsBtn.onclick = requestGPS;
         const zone = document.getElementById('tree-photo-zone');
-        const input = document.getElementById('tree-photo-input');
-        if (zone) zone.onclick = () => input.click();
-        if (input) input.onchange = e => e.target.files[0] && readTreePhoto(e.target.files[0]);
+        const cameraInput = document.getElementById('tree-photo-camera-input');
+        const fileInput = document.getElementById('tree-photo-file-input');
+        if (zone) zone.onclick = event => {
+            if (event.target.closest('button')) return;
+            fileInput.click();
+        };
+        const cameraButton = document.getElementById('tree-photo-camera-btn');
+        const fileButton = document.getElementById('tree-photo-file-btn');
+        if (cameraButton) cameraButton.onclick = () => openCameraCapture(readTreePhoto);
+        if (fileButton) fileButton.onclick = () => fileInput.click();
+        if (cameraInput) cameraInput.onchange = e => e.target.files[0] && readTreePhoto(e.target.files[0]);
+        if (fileInput) fileInput.onchange = e => e.target.files[0] && readTreePhoto(e.target.files[0]);
         const rm = document.getElementById('btn-remove-tree-photo');
         if (rm) rm.onclick = () => { wizard.treePhoto = null; renderWizard(); };
         const next = document.getElementById('btn-loc-next');
         if (next) next.onclick = () => wizardGoTo('leaf');
     } else if (wizard.step === 'leaf'){
         const zone = document.getElementById('leaf-drop-zone');
-        const input = document.getElementById('leaf-file-input');
+        const cameraInput = document.getElementById('leaf-camera-input');
+        const fileInput = document.getElementById('leaf-file-input');
         if (zone){
-            zone.onclick = () => input.click();
+            zone.onclick = event => {
+                if (event.target.closest('button')) return;
+                fileInput.click();
+            };
             zone.ondragover = e => { e.preventDefault(); zone.classList.add('dragging'); };
             zone.ondragleave = () => zone.classList.remove('dragging');
             zone.ondrop = e => { e.preventDefault(); zone.classList.remove('dragging'); const f = e.dataTransfer.files[0]; if (f) handleLeafFile(f); };
         }
-        if (input) input.onchange = e => e.target.files[0] && handleLeafFile(e.target.files[0]);
+        const cameraButton = document.getElementById('leaf-camera-btn');
+        const fileButton = document.getElementById('leaf-file-btn');
+        if (cameraButton) cameraButton.onclick = () => openCameraCapture(handleLeafFile);
+        if (fileButton) fileButton.onclick = () => fileInput.click();
+        if (cameraInput) cameraInput.onchange = e => e.target.files[0] && handleLeafFile(e.target.files[0]);
+        if (fileInput) fileInput.onchange = e => e.target.files[0] && handleLeafFile(e.target.files[0]);
         const rm = document.getElementById('btn-remove-leaf');
-        if (rm) rm.onclick = () => { wizard.leafImage = null; wizard.leafFile = null; wizard.result = null; wizard.analyzeError = null; renderWizard(); };
+        if (rm) rm.onclick = () => { wizard.leafImage = null; wizard.hsvPreview = null; wizard.hsvPreviewData = null; wizard.leafFile = null; wizard.result = null; wizard.analyzeError = null; renderWizard(); };
+        const hsvBtn = document.getElementById('btn-toggle-hsv');
+        if (hsvBtn) hsvBtn.onclick = () => { wizard.hsvPreview = wizard.hsvPreview ? null : wizard.hsvPreviewData; renderWizard(); };
         const addBtn = document.getElementById('btn-add-image');
         if (addBtn) addBtn.onclick = () => { pushPendingImage(); renderWizard(); };
         document.getElementById('btn-leaf-back').onclick = () => wizardGoTo('location');
@@ -1956,6 +2041,8 @@ function pushPendingImage(){
     const url = wizard.result.original_image || wizard.leafImage;
     wizard.images.push({ id: uid('img'), url, timestamp: new Date(), result: wizard.result });
     wizard.leafImage = null;
+    wizard.hsvPreview = null;
+    wizard.hsvPreviewData = null;
     wizard.leafFile = null;
     wizard.result = null;
     wizard.analyzeError = null;
@@ -2002,14 +2089,171 @@ function readTreePhoto(file){
     reader.readAsDataURL(file);
 }
 
+async function openCameraCapture(onCapture){
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        alert('Camera access is not supported here. Use Choose File instead.');
+        return;
+    }
+
+    const backdrop = document.createElement('div');
+    backdrop.style.cssText = 'position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.82);display:flex;align-items:center;justify-content:center;padding:16px;';
+    backdrop.innerHTML = `
+        <div style="width:min(560px,100%);background:#fff;border-radius:14px;padding:16px;">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="mb-0">Use Camera</h5>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-camera-cancel>Cancel</button>
+            </div>
+            <label class="small fw-semibold mb-1" for="camera-device-select">Input device</label>
+            <select class="form-select form-select-sm mb-3" id="camera-device-select" data-camera-device>
+                <option>Detecting cameras...</option>
+            </select>
+            <video autoplay playsinline style="display:block;width:100%;max-height:65vh;object-fit:contain;background:#111;border-radius:8px;"></video>
+            <button type="button" class="btn btn-leaf w-100 mt-3" data-camera-capture disabled>
+                <i class="bi bi-camera me-1"></i> Capture Photo
+            </button>
+            <p class="small text-muted mt-2 mb-0" data-camera-status>Requesting camera access...</p>
+        </div>`;
+    document.body.appendChild(backdrop);
+
+    const video = backdrop.querySelector('video');
+    const captureButton = backdrop.querySelector('[data-camera-capture]');
+    const cancelButton = backdrop.querySelector('[data-camera-cancel]');
+    const deviceSelect = backdrop.querySelector('[data-camera-device]');
+    const status = backdrop.querySelector('[data-camera-status]');
+    let stream = null;
+
+    const close = () => {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        backdrop.remove();
+    };
+    cancelButton.onclick = close;
+    backdrop.onclick = event => { if (event.target === backdrop) close(); };
+
+    const startStream = async deviceId => {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        const videoConstraints = deviceId
+            ? { deviceId: { exact: deviceId } }
+            : { facingMode: { ideal: 'environment' } };
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: videoConstraints,
+            audio: false,
+        });
+        video.srcObject = stream;
+        captureButton.disabled = false;
+        status.textContent = 'Position the leaf, then capture the image.';
+    };
+
+    try {
+        await startStream();
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const cameras = devices.filter(device => device.kind === 'videoinput');
+        deviceSelect.innerHTML = cameras.map((camera, index) => `
+            <option value="${camera.deviceId}">${camera.label || `Camera ${index + 1}`}</option>
+        `).join('');
+        const activeTrack = stream.getVideoTracks()[0];
+        const activeDeviceId = activeTrack && activeTrack.getSettings().deviceId;
+        if (activeDeviceId && cameras.some(camera => camera.deviceId === activeDeviceId)) {
+            deviceSelect.value = activeDeviceId;
+        }
+        deviceSelect.disabled = cameras.length < 2;
+    } catch (error){
+        status.textContent = 'Camera access was unavailable. Use Choose File instead.';
+        console.error('Camera access failed:', error);
+        return;
+    }
+
+    deviceSelect.onchange = async () => {
+        captureButton.disabled = true;
+        status.textContent = 'Switching camera...';
+        try {
+            await startStream(deviceSelect.value);
+        } catch (error){
+            status.textContent = 'Could not open that camera. Choose another device.';
+            console.error('Camera switch failed:', error);
+        }
+    };
+
+    captureButton.onclick = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        canvas.toBlob(blob => {
+            if (!blob) return;
+            onCapture(new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' }));
+            close();
+        }, 'image/jpeg', 0.92);
+    };
+}
+
+function createHSVThresholdPreview(dataUrl){
+    return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(image, 0, 0);
+            const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+            const values = pixels.data;
+
+            for (let index = 0; index < values.length; index += 4){
+                const red = values[index] / 255;
+                const green = values[index + 1] / 255;
+                const blue = values[index + 2] / 255;
+                const max = Math.max(red, green, blue);
+                const min = Math.min(red, green, blue);
+                const delta = max - min;
+                let hue = 0;
+                if (delta){
+                    if (max === red) hue = 60 * (((green - blue) / delta) % 6);
+                    else if (max === green) hue = 60 * ((blue - red) / delta + 2);
+                    else hue = 60 * ((red - green) / delta + 4);
+                }
+                if (hue < 0) hue += 360;
+                const saturation = max === 0 ? 0 : delta / max;
+                const value = max;
+                // Match the stricter server-side leaf threshold: green and
+                // yellow-green only, with enough saturation to reject soil,
+                // sky, glare, and most lesion-colored pixels.
+                const pixelX = (index / 4) % canvas.width;
+                const pixelY = Math.floor((index / 4) / canvas.width);
+                const focusDistance = Math.pow(
+                    (pixelX - canvas.width / 2) / (canvas.width * 0.48), 2
+                ) + Math.pow(
+                    (pixelY - canvas.height / 2) / (canvas.height * 0.48), 2
+                );
+                const keep = hue >= 30 && hue <= 170
+                    && saturation >= 0.25 && value >= 0.15
+                    && focusDistance <= 1;
+                values[index] = keep ? 60 : 0;
+                values[index + 1] = keep ? 190 : 0;
+                values[index + 2] = keep ? 60 : 0;
+                values[index + 3] = 255;
+            }
+            context.putImageData(pixels, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+        };
+        image.onerror = reject;
+        image.src = dataUrl;
+    });
+}
+
 function handleLeafFile(file){
     if (!file.type.startsWith('image/')) return;
     wizard.leafFile = file;
+    wizard.hsvPreview = null;
+    wizard.hsvPreviewData = null;
     wizard.result = null;
     wizard.analyzeError = null;
     const reader = new FileReader();
     reader.onload = e => {
         wizard.leafImage = e.target.result;
+        createHSVThresholdPreview(wizard.leafImage).then(preview => {
+            wizard.hsvPreviewData = preview;
+            renderWizard();
+        });
         renderWizard();
         runAnalysis();
     };
@@ -2070,7 +2314,7 @@ let addImgState = { preview:null, file:null, analyzing:false, error:null };
 
 function openAddImageModal(treeId){
     captureTargetTreeId = treeId;
-    addImgState = { preview:null, file:null, analyzing:false, error:null };
+    addImgState = { preview:null, hsvPreview:null, hsvPreviewData:null, file:null, analyzing:false, error:null };
     const tree = trees.find(t => t.id === treeId);
     document.getElementById('addimg-subtitle').textContent = tree ? `Tree #${tree.treeNumber} \u00b7 ${tree.locationLabel}` : '';
     document.getElementById('addimg-backdrop').style.display = 'flex';
@@ -2087,18 +2331,26 @@ function renderAddImageModal(){
     ${!addImgState.preview ? `
         <div class="drop-zone" id="addimg-drop-zone">
             <div class="icon-circle"><i class="bi bi-camera"></i></div>
-            <p class="fw-semibold mb-1">Drop an image or click to browse</p>
+            <p class="fw-semibold mb-1">Add an image</p>
             <p class="small text-muted mb-0">JPG, PNG &mdash; up to 10&nbsp;MB</p>
+            <div class="d-flex justify-content-center gap-2 mt-3">
+                <button type="button" class="btn btn-leaf capture-choice-btn btn-sm" id="addimg-camera-btn"><i class="bi bi-camera me-1"></i> Use Camera</button>
+                <button type="button" class="btn btn-outline-secondary capture-choice-btn btn-sm" id="addimg-file-btn"><i class="bi bi-folder2-open me-1"></i> Choose File</button>
+            </div>
         </div>` : `
         <div class="leaf-preview mb-2">
-            <img src="${addImgState.preview}">
+            <img src="${addImgState.hsvPreview || addImgState.preview}" alt="${addImgState.hsvPreview ? 'HSV threshold preview' : 'Leaf image'}">
             ${!addImgState.analyzing ? `<button type="button" class="remove-btn" id="addimg-remove"><i class="bi bi-x"></i></button>` : `
                 <div class="analyzing-overlay">
                     <i class="bi bi-arrow-repeat spin" style="font-size:1.6rem;"></i>
                     <p class="small mb-0 fw-semibold">Analyzing&hellip;</p>
                 </div>`}
-        </div>`}
-    <input type="file" accept="image/*" capture="environment" id="addimg-file-input" style="display:none;">
+        </div>
+        <button type="button" class="btn btn-outline-success btn-sm w-100 mb-2" id="addimg-toggle-hsv">
+            <i class="bi bi-eye"></i> ${addImgState.hsvPreview ? 'Show Original Image' : 'Show HSV Threshold'}
+        </button>`}
+    <input type="file" accept="image/*" capture="environment" id="addimg-camera-input" style="display:none;">
+    <input type="file" accept="image/*" id="addimg-file-input" style="display:none;">
     ${addImgState.error ? `<p class="small text-danger mt-2">${esc(addImgState.error)}</p>` : ''}
     <button type="button" class="btn btn-leaf w-100 mt-3" id="addimg-analyze-btn" ${(!addImgState.preview || addImgState.analyzing)?'disabled':''}>
         ${addImgState.analyzing ? 'Analyzing&hellip;' : 'Analyze &amp; Add to Tree'}
@@ -2107,15 +2359,26 @@ function renderAddImageModal(){
 
     const zone = document.getElementById('addimg-drop-zone');
     const input = document.getElementById('addimg-file-input');
+    const cameraInput = document.getElementById('addimg-camera-input');
     if (zone){
-        zone.onclick = () => input.click();
+        zone.onclick = event => {
+            if (event.target.closest('button')) return;
+            input.click();
+        };
         zone.ondragover = e => { e.preventDefault(); zone.classList.add('dragging'); };
         zone.ondragleave = () => zone.classList.remove('dragging');
         zone.ondrop = e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) addImgProcessFile(f); };
     }
+    const cameraButton = document.getElementById('addimg-camera-btn');
+    const fileButton = document.getElementById('addimg-file-btn');
+    if (cameraButton) cameraButton.onclick = () => openCameraCapture(addImgProcessFile);
+    if (fileButton) fileButton.onclick = () => input.click();
+    if (cameraInput) cameraInput.onchange = e => e.target.files[0] && addImgProcessFile(e.target.files[0]);
     if (input) input.onchange = e => e.target.files[0] && addImgProcessFile(e.target.files[0]);
     const rm = document.getElementById('addimg-remove');
-    if (rm) rm.onclick = () => { addImgState.preview=null; addImgState.file=null; renderAddImageModal(); };
+    if (rm) rm.onclick = () => { addImgState.preview=null; addImgState.hsvPreview=null; addImgState.hsvPreviewData=null; addImgState.file=null; renderAddImageModal(); };
+    const hsvBtn = document.getElementById('addimg-toggle-hsv');
+    if (hsvBtn) hsvBtn.onclick = () => { addImgState.hsvPreview = addImgState.hsvPreview ? null : addImgState.hsvPreviewData; renderAddImageModal(); };
     const analyzeBtn = document.getElementById('addimg-analyze-btn');
     if (analyzeBtn) analyzeBtn.onclick = addImgAnalyze;
 }
@@ -2123,9 +2386,18 @@ function renderAddImageModal(){
 function addImgProcessFile(file){
     if (!file.type.startsWith('image/')) return;
     addImgState.file = file;
+    addImgState.hsvPreview = null;
+    addImgState.hsvPreviewData = null;
     addImgState.error = null;
     const reader = new FileReader();
-    reader.onload = e => { addImgState.preview = e.target.result; renderAddImageModal(); };
+    reader.onload = e => {
+        addImgState.preview = e.target.result;
+        renderAddImageModal();
+        createHSVThresholdPreview(addImgState.preview).then(preview => {
+            addImgState.hsvPreviewData = preview;
+            renderAddImageModal();
+        });
+    };
     reader.readAsDataURL(file);
 }
 
